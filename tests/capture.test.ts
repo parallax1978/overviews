@@ -63,6 +63,7 @@ type SingleResult = { data: Row | null; error: QueryError | null };
 interface Tables {
   trackers: Row[];
   snapshots: Row[];
+  analyses: Row[];
   api_log: Row[];
 }
 
@@ -71,8 +72,10 @@ interface Builder {
   insert(values: Row): Builder;
   update(values: Row): Builder;
   eq(column: string, value: unknown): Builder;
+  lte(column: string, value: unknown): Builder;
   in(column: string, list: unknown[]): Builder;
   order(column: string, opts?: { ascending?: boolean }): Builder;
+  limit(count: number): Builder;
   single(): Promise<SingleResult>;
   maybeSingle(): Promise<SingleResult>;
   then<T>(
@@ -81,7 +84,16 @@ interface Builder {
   ): Promise<T>;
 }
 
-/** Just enough of the supabase query builder for lib/capture.ts, backed by in-memory rows. */
+function compare(x: unknown, y: unknown): number {
+  if (x === y) return 0;
+  return (x as number | string) < (y as number | string) ? -1 : 1;
+}
+
+/**
+ * Just enough of the supabase query builder for lib/capture.ts, backed by in-memory rows.
+ * Embedded selects (`analyses(id)`, `snapshots!inner(id)`) join child tables on
+ * `tracker_id`; a dotted filter (`snapshots.has_overview`) applies to that embed.
+ */
 function fakeAdmin(tables: Tables) {
   let nextId = 1;
   return {
@@ -90,7 +102,28 @@ function fakeAdmin(tables: Tables) {
       let op: "select" | "insert" | "update" = "select";
       let values: Row = {};
       const filters: ((row: Row) => boolean)[] = [];
+      const embeds: { name: keyof Tables; inner: boolean }[] = [];
+      const embedFilters: Record<string, ((row: Row) => boolean)[]> = {};
       let orderBy: { column: string; ascending: boolean } | null = null;
+      let limitTo: number | null = null;
+
+      const addFilter = (column: string, test: (row: Row) => boolean) => {
+        const [embed, field] = column.split(".");
+        if (field === undefined) filters.push(test);
+        else (embedFilters[embed] ??= []).push((r) => test({ [column]: r[field] }));
+      };
+      const withEmbeds = (row: Row): Row | null => {
+        if (embeds.length === 0) return row;
+        const out: Row = { ...row };
+        for (const { name, inner } of embeds) {
+          const children = tables[name].filter(
+            (c) => c.tracker_id === row.id && (embedFilters[name] ?? []).every((f) => f(c)),
+          );
+          if (inner && children.length === 0) return null;
+          out[name] = children;
+        }
+        return out;
+      };
 
       const run = (): QueryResult => {
         if (op === "insert") {
@@ -109,12 +142,14 @@ function fakeAdmin(tables: Tables) {
           rows.push(row);
           return { data: [row], error: null };
         }
-        const matched = rows.filter((r) => filters.every((f) => f(r)));
+        let matched = rows.filter((r) => filters.every((f) => f(r)));
         if (op === "update") for (const r of matched) Object.assign(r, values);
         if (orderBy) {
           const { column, ascending } = orderBy;
-          matched.sort((x, y) => (Number(x[column]) - Number(y[column])) * (ascending ? 1 : -1));
+          matched.sort((x, y) => compare(x[column], y[column]) * (ascending ? 1 : -1));
         }
+        if (op === "select") matched = matched.map(withEmbeds).filter((r): r is Row => r !== null);
+        if (limitTo !== null) matched = matched.slice(0, limitTo);
         return { data: matched, error: null };
       };
       const one = async (): Promise<SingleResult> => {
@@ -123,7 +158,12 @@ function fakeAdmin(tables: Tables) {
       };
 
       const builder: Builder = {
-        select: () => builder,
+        select: (columns = "*") => {
+          for (const m of columns.matchAll(/(\w+)(!inner)?\([^)]*\)/g)) {
+            embeds.push({ name: m[1] as keyof Tables, inner: m[2] !== undefined });
+          }
+          return builder;
+        },
         insert: (v) => {
           op = "insert";
           values = v;
@@ -135,15 +175,23 @@ function fakeAdmin(tables: Tables) {
           return builder;
         },
         eq: (column, value) => {
-          filters.push((r) => r[column] === value);
+          addFilter(column, (r) => r[column] === value);
+          return builder;
+        },
+        lte: (column, value) => {
+          addFilter(column, (r) => r[column] != null && compare(r[column], value) <= 0);
           return builder;
         },
         in: (column, list) => {
-          filters.push((r) => list.includes(r[column]));
+          addFilter(column, (r) => list.includes(r[column]));
           return builder;
         },
         order: (column, opts) => {
           orderBy = { column, ascending: opts?.ascending ?? true };
+          return builder;
+        },
+        limit: (count) => {
+          limitTo = count;
           return builder;
         },
         single: one,
@@ -167,7 +215,8 @@ vi.mock("@/lib/dataforseo", async (importOriginal) => {
   return { ...actual, fetchSerpWithAiOverview: mocks.fetchSerp };
 });
 
-const { captureSnapshot } = await import("@/lib/capture");
+const { captureSnapshot, runDueCaptures } = await import("@/lib/capture");
+const { runAnalysis } = await import("@/lib/analyze");
 
 const fixturesDir = path.join(path.dirname(fileURLToPath(import.meta.url)), "fixtures");
 const realFixture = path.join(fixturesDir, "dataforseo-ai-overview.real.json");
@@ -267,7 +316,7 @@ describe("captureSnapshot", () => {
   let tables: Tables;
 
   beforeEach(() => {
-    tables = { trackers: [tracker()], snapshots: [], api_log: [] };
+    tables = { trackers: [tracker()], snapshots: [], analyses: [], api_log: [] };
     mocks.admin = fakeAdmin(tables);
     mocks.fetchSerp.mockReset();
     vi.spyOn(console, "warn").mockImplementation(() => {});
@@ -502,5 +551,72 @@ describe("captureSnapshot", () => {
       expect(snapshot.raw).toEqual({ items: [item] });
     }
     expect(snapshots[0].diff?.added_refs).toEqual(snapshots[0].references.map((r) => r.url));
+  });
+});
+
+// ---------------------------------------------------------------------------
+// runDueCaptures: the pending-report queue (reports owed from earlier runs).
+// ---------------------------------------------------------------------------
+
+describe("runDueCaptures pending reports", () => {
+  const now = new Date("2026-10-17T06:05:00Z");
+  const NO_OVERVIEW = "tracker-no-overview";
+  const WITH_OVERVIEW = "tracker-with-overview";
+  const ANALYZED = "tracker-analyzed";
+
+  /** A tracker that finished its 7 days: not due for capture, waiting on a report. */
+  function readyTracker(id: string, createdAt: string): Row {
+    return tracker({ id, status: "ready", day_count: 7, created_at: createdAt, next_capture_at: "2026-10-17T00:00:00.000Z" });
+  }
+
+  beforeEach(() => {
+    vi.mocked(runAnalysis).mockReset();
+    vi.spyOn(console, "error").mockImplementation(() => {});
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("never sends a ready keyword without any AI Overview for a report", async () => {
+    const tables: Tables = { trackers: [readyTracker(NO_OVERVIEW, "2026-10-09T06:00:00.000Z")], snapshots: [], analyses: [], api_log: [] };
+    for (let day = 1; day <= 7; day++) {
+      for (let sample = 1; sample <= SAMPLES_PER_DAY; sample++) {
+        tables.snapshots.push({ ...storedSample(day, sample, [], null), tracker_id: NO_OVERVIEW });
+      }
+    }
+    mocks.admin = fakeAdmin(tables);
+
+    const summary = await runDueCaptures({ now });
+
+    expect(runAnalysis).not.toHaveBeenCalled();
+    expect(summary).toEqual({ captured: [], failed: [], analyzed: [], analysisFailed: [] });
+  });
+
+  it("gives the pending slot to the oldest ready keyword that has an overview and no report", async () => {
+    const tables: Tables = {
+      trackers: [
+        readyTracker(NO_OVERVIEW, "2026-10-09T06:00:00.000Z"), // oldest: would otherwise take the slot every run
+        readyTracker(ANALYZED, "2026-10-09T07:00:00.000Z"),
+        readyTracker(WITH_OVERVIEW, "2026-10-10T06:00:00.000Z"),
+      ],
+      snapshots: [
+        { ...storedSample(7, 1, [], null), tracker_id: NO_OVERVIEW },
+        { ...storedSample(7, 1, [A], dayOneText), tracker_id: ANALYZED },
+        { ...storedSample(7, 1, [], null), tracker_id: WITH_OVERVIEW },
+        { ...storedSample(7, 2, [A], dayOneText), tracker_id: WITH_OVERVIEW },
+      ],
+      analyses: [{ id: "analysis-1", tracker_id: ANALYZED, status: "done" }],
+      api_log: [],
+    };
+    mocks.admin = fakeAdmin(tables);
+
+    const summary = await runDueCaptures({ now });
+
+    expect(runAnalysis).toHaveBeenCalledTimes(1);
+    expect(runAnalysis).toHaveBeenCalledWith(WITH_OVERVIEW);
+    expect(summary.analyzed).toEqual([WITH_OVERVIEW]);
+    expect(summary.analysisFailed).toEqual([]);
+    expect(summary.captured).toEqual([]);
   });
 });

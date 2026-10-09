@@ -128,7 +128,7 @@ export async function runDueCaptures(opts?: {
   const startedAt = Date.now();
   const elapsed = () => Date.now() - startedAt;
 
-  // Reports owed from earlier runs: trackers at their target that were never analyzed.
+  // Reports owed from earlier runs: trackers at their target, with an overview, that were never analyzed.
   const pending = await loadPendingReports(admin, PENDING_REPORTS_PER_RUN);
   const needsReport: string[] = [...pending];
 
@@ -235,12 +235,19 @@ async function loadSample(
   return (data as Snapshot | null) ?? null;
 }
 
-/** Trackers at their day target with no analysis at all, oldest first. */
+/**
+ * Trackers at their day target with at least one AI Overview sample and no
+ * analysis at all, oldest first. A keyword that never showed an overview cannot
+ * be analyzed (runAnalysis refuses it before claiming the tracker), so it must
+ * not take the slot every run; the filter runs server-side so a backlog of
+ * such trackers cannot crowd out real candidates within the row limit.
+ */
 async function loadPendingReports(admin: SupabaseClient, limit: number): Promise<string[]> {
   const { data, error } = await admin
     .from("trackers")
-    .select("id, analyses(id)")
+    .select("id, analyses(id), snapshots!inner(id)")
     .eq("status", "ready")
+    .eq("snapshots.has_overview", true) // !inner drops trackers with no matching sample
     .order("created_at", { ascending: true })
     .limit(50);
   if (error) {

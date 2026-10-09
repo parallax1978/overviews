@@ -14,6 +14,7 @@ import { AnalyzeButton } from "@/components/app/analyze-button";
 import { Card } from "@/components/ui/card";
 import { Chip } from "@/components/ui/chip";
 import { Eyebrow } from "@/components/ui/eyebrow";
+import { LocalTime } from "@/components/ui/local-time";
 import { Markdown } from "@/components/ui/markdown";
 import { NumberBadge } from "@/components/ui/number-badge";
 import type { Analysis, Tracker } from "@/lib/types";
@@ -21,8 +22,10 @@ import { pluralize } from "@/lib/utils";
 
 export interface ReportViewProps {
   tracker: Pick<Tracker, "id" | "status" | "days_target">;
-  /** The newest analysis row, or null when none has been started. */
+  /** The newest analysis row of any status, or null when none has been started. */
   analysis: Analysis | null;
+  /** The newest finished report, or null when none has finished yet. */
+  report: Analysis | null;
   /** Samples (across all days) in which an AI Overview actually appeared. */
   snapshotsWithOverview: number;
   /** Days with at least one sample that had an AI Overview; a fallback denominator for reports without days_total. */
@@ -44,6 +47,7 @@ const REPORT_CONTENTS = [
 export function ReportView({
   tracker,
   analysis,
+  report,
   snapshotsWithOverview,
   daysWithOverview = 0,
   dayCount,
@@ -62,7 +66,7 @@ export function ReportView({
         : "No AI Overview has appeared for this search yet. We need at least one sample with one."
       : null;
 
-  if (!analysis || analysis.status !== "done") {
+  if (!report) {
     return (
       <div className="space-y-5">
         {analysis?.status === "error" ? (
@@ -85,9 +89,27 @@ export function ReportView({
     );
   }
 
+  // One call to action above the report: a failed re-run comes first, else a report that predates the last captures.
   return (
     <div className="space-y-5">
-      {staleReport ? (
+      {analysis?.status === "error" ? (
+        <div
+          role="alert"
+          className="flex flex-col gap-4 rounded-2xl border border-line bg-bad-soft p-5 sm:flex-row sm:items-center sm:justify-between"
+        >
+          <div className="flex items-start gap-3 text-sm text-bad">
+            <TriangleAlert className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+            <div>
+              <p className="font-semibold">
+                We couldn&apos;t update this report, so this is the one from{" "}
+                <LocalTime iso={report.created_at} mode="date" />.
+              </p>
+              <p className="mt-1">{analysis.error ?? "Something went wrong while writing it."}</p>
+            </div>
+          </div>
+          <AnalyzeButton trackerId={tracker.id} disabled={false} reason={null} label="Try again" />
+        </div>
+      ) : staleReport ? (
         <Card className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <p className="font-semibold text-ink">All {tracker.days_target} days are in.</p>
@@ -100,7 +122,7 @@ export function ReportView({
       ) : null}
       <Report
         tracker={tracker}
-        analysis={analysis}
+        analysis={report}
         snapshotsWithOverview={snapshotsWithOverview}
         daysWithOverview={daysWithOverview}
       />

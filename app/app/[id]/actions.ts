@@ -1,8 +1,10 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { restingStatus } from "@/lib/analyze";
 import { requireUser } from "@/lib/auth";
 import { captureSnapshot } from "@/lib/capture";
+import { nextCaptureAt } from "@/lib/schedule";
 import { createClient } from "@/lib/supabase/server";
 import type { Tracker, TrackerStatus } from "@/lib/types";
 
@@ -10,9 +12,8 @@ import type { Tracker, TrackerStatus } from "@/lib/types";
 export type TrackerActionResult = { ok: true } | { ok: false; error: string };
 
 type UserClient = Awaited<ReturnType<typeof createClient>>;
-type OwnedTracker = Pick<Tracker, "id" | "status" | "day_count" | "days_target" | "keep_tracking">;
+type OwnedTracker = Pick<Tracker, "id" | "status" | "day_count" | "days_target" | "keep_tracking" | "next_capture_at">;
 
-const DAY_MS = 24 * 60 * 60 * 1000;
 const NOT_FOUND: TrackerActionResult = { ok: false, error: "We couldn't find that keyword." };
 const PAUSABLE: TrackerStatus[] = ["tracking", "ready", "analyzed"];
 
@@ -26,7 +27,7 @@ async function loadOwned(trackerId: string): Promise<{ supabase: UserClient; tra
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("trackers")
-    .select("id, status, day_count, days_target, keep_tracking")
+    .select("id, status, day_count, days_target, keep_tracking, next_capture_at")
     .eq("id", trackerId)
     .maybeSingle();
   if (error) {
@@ -64,37 +65,40 @@ export async function pauseTracker(trackerId: string): Promise<TrackerActionResu
   return updateTracker(supabase, trackerId, { status: "paused" });
 }
 
-/** Restarts a paused keyword: back to tracking, or to ready/analyzed when all days are in. Captures again right away. */
+/**
+ * Restarts a paused keyword: back to analyzed when it has a report (it keeps capturing until all
+ * days are in), else to ready when all days are in, else to tracking. Captures again right away.
+ */
 export async function resumeTracker(trackerId: string): Promise<TrackerActionResult> {
   const { supabase, tracker } = await loadOwned(trackerId);
   if (!tracker) return NOT_FOUND;
   if (tracker.status !== "paused") return fail("This keyword isn't paused.");
 
-  let status: TrackerStatus = "tracking";
-  if (tracker.day_count >= tracker.days_target) {
-    const { data: analysis } = await supabase
-      .from("analyses")
-      .select("id")
-      .eq("tracker_id", trackerId)
-      .eq("status", "done")
-      .limit(1)
-      .maybeSingle();
-    status = analysis ? "analyzed" : "ready";
-  }
+  const { data: analysis } = await supabase
+    .from("analyses")
+    .select("id")
+    .eq("tracker_id", trackerId)
+    .eq("status", "done")
+    .limit(1)
+    .maybeSingle();
 
   return updateTracker(supabase, trackerId, {
-    status,
+    status: restingStatus(tracker, Boolean(analysis)),
     next_capture_at: new Date().toISOString(),
   });
 }
 
-/** Turns "keep tracking after publish" on or off. Turning it on schedules the next capture for tomorrow. */
+/**
+ * Turns "keep tracking after publish" on or off. Turning it on makes the next
+ * daily run capture again; a capture that is already scheduled is never pushed later.
+ */
 export async function setKeepTracking(trackerId: string, on: boolean): Promise<TrackerActionResult> {
   const { supabase, tracker } = await loadOwned(trackerId);
   if (!tracker) return NOT_FOUND;
 
   const values: Partial<Tracker> = { keep_tracking: on };
-  if (on) values.next_capture_at = new Date(Date.now() + DAY_MS).toISOString();
+  const due = tracker.next_capture_at ? new Date(tracker.next_capture_at).getTime() : null;
+  if (on && (due === null || due <= Date.now())) values.next_capture_at = nextCaptureAt().toISOString();
   return updateTracker(supabase, trackerId, values);
 }
 

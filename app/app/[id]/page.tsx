@@ -67,17 +67,27 @@ export default async function TrackerPage({ params, searchParams }: PageProps) {
     }
   }
 
-  const [snapshotsRes, analysisRes, draftRes] = await Promise.all([
+  const [snapshotsRes, analysisRes, reportRes, draftRes] = await Promise.all([
     supabase
       .from("snapshots")
       .select("*")
       .eq("tracker_id", id)
       .order("day_number", { ascending: true })
       .order("sample", { ascending: true }),
+    // The newest report of any status: says whether one is running or the last run failed.
     supabase
       .from("analyses")
       .select("*")
       .eq("tracker_id", id)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle(),
+    // The newest finished report: what the Report tab shows, even after a later re-run failed.
+    supabase
+      .from("analyses")
+      .select("*")
+      .eq("tracker_id", id)
+      .eq("status", "done")
       .order("created_at", { ascending: false })
       .limit(1)
       .maybeSingle(),
@@ -91,32 +101,38 @@ export default async function TrackerPage({ params, searchParams }: PageProps) {
   ]);
   if (snapshotsRes.error) console.error("snapshots query failed", snapshotsRes.error.message);
   if (analysisRes.error) console.error("analysis query failed", analysisRes.error.message);
+  if (reportRes.error) console.error("report query failed", reportRes.error.message);
   if (draftRes.error) console.error("draft query failed", draftRes.error.message);
 
   const snapshots = (snapshotsRes.data ?? []) as Snapshot[];
   const analysis = (analysisRes.data as Analysis | null) ?? null;
+  const report = (reportRes.data as Analysis | null) ?? null;
   const draft = (draftRes.data as Draft | null) ?? null;
 
   const citationRows = aggregateCitations(snapshots);
   // Each day holds several samples (one snapshot row each); the report and the Citations tab count samples.
   const totals = countTotals(snapshots);
   const snapshotsWithOverview = totals.samplesWithOverview;
-  const activeTab = resolveTab(tab, tracker.status);
   const analyzing = tracker.status === "analyzing";
+  // A finished report exists and none is being built. A paused keyword keeps its report and stays paused.
+  const hasReport = !analyzing && report !== null;
+  const activeTab = resolveTab(tab, hasReport);
   // The report is done but its page was never written (the function was stopped in between).
-  const needsDraft = tracker.status === "analyzed" && analysis?.status === "done" && draft?.analysis_id !== analysis.id;
+  const needsDraft = !analyzing && report !== null && draft?.analysis_id !== report.id;
   // All days are in but no report was ever built (the cron ran out of time): build it on open.
   const needsReport = tracker.status === "ready" && !analysis && snapshotsWithOverview > 0;
   // A report exists but days were captured after it: offer a fresh one once all days are in.
   const reportStale =
-    tracker.status === "analyzed" && tracker.day_count >= tracker.days_target && isReportStale(analysis, snapshots);
+    tracker.status === "analyzed" && tracker.day_count >= tracker.days_target && isReportStale(report, snapshots);
   const languageName = LANGUAGES.find((l) => l.code === tracker.language_code)?.name ?? tracker.language_code;
   const deviceName = tracker.device === "mobile" ? "Mobile" : "Desktop";
 
   return (
     <div>
       {analyzing ? <AutoRefresh intervalMs={4000} /> : null}
-      {needsDraft && activeTab !== "draft" ? <DraftAutoStart trackerId={tracker.id} silent /> : null}
+      {needsDraft && activeTab !== "draft" ? (
+        <DraftAutoStart trackerId={tracker.id} analysisId={report.id} silent />
+      ) : null}
 
       <Link href="/app" className="inline-flex items-center gap-1.5 text-sm text-ink-muted hover:text-ink">
         <ArrowLeft className="h-4 w-4" aria-hidden="true" />
@@ -185,6 +201,7 @@ export default async function TrackerPage({ params, searchParams }: PageProps) {
             <ReportView
               tracker={tracker}
               analysis={analysis}
+              report={report}
               snapshotsWithOverview={snapshotsWithOverview}
               daysWithOverview={totals.daysWithOverview}
               dayCount={tracker.day_count}
@@ -192,13 +209,13 @@ export default async function TrackerPage({ params, searchParams }: PageProps) {
             />
           )
         ) : needsDraft ? (
-          <DraftAutoStart trackerId={tracker.id} />
+          <DraftAutoStart trackerId={tracker.id} analysisId={report.id} />
         ) : (
           <DraftView
             trackerId={tracker.id}
             keyword={tracker.keyword}
             draft={draft}
-            canRegenerate={tracker.status === "analyzed"}
+            canRegenerate={hasReport}
           />
         )}
       </div>

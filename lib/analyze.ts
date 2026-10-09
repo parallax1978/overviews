@@ -75,9 +75,22 @@ function countDays(snapshots: Pick<Snapshot, "day_number">[]): number {
   return new Set(snapshots.map((s) => s.day_number)).size;
 }
 
-/** Status for a tracker that is not being analyzed and has no usable prior status. */
-function restingStatus(tracker: Pick<Tracker, "day_count" | "days_target">): TrackerStatus {
+/**
+ * Status for a tracker that is not being analyzed and has no usable prior
+ * status: "analyzed" when a finished report exists (it keeps capturing until
+ * all days are in), else "ready" once all days are in, else "tracking".
+ */
+export function restingStatus(tracker: Pick<Tracker, "day_count" | "days_target">, hasReport: boolean): TrackerStatus {
+  if (hasReport) return "analyzed";
   return tracker.day_count >= tracker.days_target ? "ready" : "tracking";
+}
+
+/**
+ * Status for a tracker whose report just finished. A paused keyword stays
+ * paused: a report must not restart the daily capture the user stopped.
+ */
+export function statusAfterAnalysis(previous: TrackerStatus): TrackerStatus {
+  return previous === "paused" ? "paused" : "analyzed";
 }
 
 /** Error recorded when the platform stopped a report before it finished (e.g. the function hit maxDuration). */
@@ -113,7 +126,7 @@ export async function recoverStaleAnalysis(trackerId: string): Promise<{ recover
   const { error: trackerError } = await admin
     .from("trackers")
     .update({
-      status: done ? "analyzed" : restingStatus(tracker),
+      status: restingStatus(tracker, Boolean(done)),
       last_error: done ? null : STALE_ANALYSIS_MESSAGE,
     })
     .eq("id", trackerId);
@@ -126,8 +139,9 @@ export async function recoverStaleAnalysis(trackerId: string): Promise<{ recover
  * Build the report for a tracker: patterns, citation research, blueprint and
  * summary. Claims the tracker atomically (status "analyzing"), so two callers
  * cannot start two paid analyses; the loser gets AnalysisInProgressError.
- * On success the tracker is "analyzed"; the draft is written separately
- * (regenerateDraft), which the keyword page starts automatically.
+ * On success the tracker is "analyzed", or stays "paused" if it was paused;
+ * the draft is written separately (regenerateDraft), which the keyword page
+ * starts automatically.
  * Throws on failure after recording the error on the analyses row and the tracker.
  */
 export async function runAnalysis(trackerId: string): Promise<Analysis> {
@@ -221,7 +235,10 @@ export async function runAnalysis(trackerId: string): Promise<Analysis> {
       duration_ms: Date.now() - startedAt,
     });
 
-    await admin.from("trackers").update({ status: "analyzed", last_error: null }).eq("id", trackerId);
+    await admin
+      .from("trackers")
+      .update({ status: statusAfterAnalysis(fallback), last_error: null })
+      .eq("id", trackerId);
     return doneRow as Analysis;
   } catch (err) {
     const message = errorMessage(err);

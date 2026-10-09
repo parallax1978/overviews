@@ -56,7 +56,20 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     }
   }
 
-  if (tracker.status !== "analyzed") {
+  if (tracker.status === "analyzing") {
+    return NextResponse.json({ error: "Your report is still being built. Give it a minute." }, { status: 409 });
+  }
+
+  // Any other status may write a page from its finished report: a paused keyword keeps its report.
+  const { data: report, error: reportError } = await supabase
+    .from("analyses")
+    .select("id")
+    .eq("tracker_id", id)
+    .eq("status", "done")
+    .limit(1)
+    .maybeSingle();
+  if (reportError) return NextResponse.json({ error: reportError.message }, { status: 500 });
+  if (!report) {
     return NextResponse.json({ error: "Build the report first, then you can write a new draft." }, { status: 422 });
   }
 

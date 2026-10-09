@@ -1,5 +1,4 @@
 import Link from "next/link";
-import type { TrackerStatus } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 export type TabKey = "timeline" | "citations" | "report" | "draft";
@@ -13,11 +12,11 @@ const TAB_LABELS: Record<TabKey, string> = {
 
 const TAB_ORDER: TabKey[] = ["timeline", "citations", "report", "draft"];
 
-/** Picks the tab to show: the ?tab= value when valid, else Report once the report exists, else Timeline. */
-export function resolveTab(param: string | string[] | undefined, status: TrackerStatus): TabKey {
+/** Picks the tab to show: the ?tab= value when valid, else Report once a finished report exists, else Timeline. */
+export function resolveTab(param: string | string[] | undefined, hasReport: boolean): TabKey {
   const raw = Array.isArray(param) ? param[0] : param;
   if (raw && (TAB_ORDER as string[]).includes(raw)) return raw as TabKey;
-  return status === "analyzed" ? "report" : "timeline";
+  return hasReport ? "report" : "timeline";
 }
 
 export interface TabsProps {

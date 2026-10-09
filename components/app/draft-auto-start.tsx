@@ -8,15 +8,18 @@ import { Card } from "@/components/ui/card";
 import { Eyebrow } from "@/components/ui/eyebrow";
 
 /**
- * A draft request started this long ago in this browser tab counts as lost
- * (the route's maxDuration is 300 s), so a later visit starts a new one.
+ * A draft request started this long ago in this browser tab counts as lost,
+ * so a later visit starts a new one. Longer than the route's maxDuration
+ * (800 s), so a request that is still running is never started over.
  */
-const STARTED_TTL_MS = 5 * 60 * 1000;
+const STARTED_TTL_MS = 15 * 60 * 1000;
 /** How often to look for the draft while a request started earlier in this tab is still running. */
 const POLL_MS = 5000;
 
 export interface DraftAutoStartProps {
   trackerId: string;
+  /** The finished report the page is written for. */
+  analysisId: string;
   /** Start the draft without showing anything (the Draft tab shows the progress). */
   silent?: boolean;
 }
@@ -25,14 +28,16 @@ export interface DraftAutoStartProps {
  * Shown in place of the draft when the report is done but its page was never
  * written (the function that writes both was stopped in between). Starts the
  * draft once on mount, then refreshes the page so the draft shows up.
- * A sessionStorage marker keeps a reload, or the other tabs of the keyword
- * page, from starting a second draft while the first one is still running.
+ * A sessionStorage marker, keyed by the report, keeps a reload, or the other
+ * tabs of the keyword page, from starting a second draft while the first one
+ * is still running. The marker stays after a success (it expires on its own),
+ * so a missing marker only ever means a request in this tab failed.
  */
-export function DraftAutoStart({ trackerId, silent = false }: DraftAutoStartProps) {
+export function DraftAutoStart({ trackerId, analysisId, silent = false }: DraftAutoStartProps) {
   const router = useRouter();
   const started = useRef(false);
   const [error, setError] = useState<string | null>(null);
-  const storageKey = `draft-auto-${trackerId}`;
+  const storageKey = `draft-auto-${trackerId}-${analysisId}`;
 
   const start = useCallback(async () => {
     writeStartedAt(storageKey, Date.now());
@@ -47,7 +52,9 @@ export function DraftAutoStart({ trackerId, silent = false }: DraftAutoStartProp
         setError(await readError(response));
         return;
       }
-      clearStartedAt(storageKey);
+      // The draft is written. Keep the marker: a poller in another mount of this page
+      // (the user switched tabs meanwhile) must not read "marker gone" as "nothing is
+      // running" and pay for a second draft. The refreshed page unmounts both.
       router.refresh();
     } catch {
       // The server may still be writing: keep the marker so a reload waits instead of paying for a second draft.
@@ -65,7 +72,8 @@ export function DraftAutoStart({ trackerId, silent = false }: DraftAutoStartProp
       return;
     }
     // A request started earlier in this tab (before a reload, or from another tab of
-    // this page) is probably still running: wait for its draft, start over if it never lands.
+    // this page) is running or has just finished: wait for its draft. Start over only
+    // when that request failed (it cleared the marker) or never landed (marker expired).
     const timer = setInterval(() => {
       const at = readStartedAt(storageKey);
       if (at == null || Date.now() - at >= STARTED_TTL_MS) {

@@ -7,7 +7,11 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Eyebrow } from "@/components/ui/eyebrow";
 
-/** A report request started this long ago in this tab counts as lost (the route's maxDuration is 300s). */
+/**
+ * A report request started this long ago in this tab counts as lost. The analyze
+ * route (maxDuration 800 s) claims the tracker server-side, so starting over while
+ * it is still running only gets a 409 and keeps waiting; it never pays twice.
+ */
 const STARTED_TTL_MS = 6 * 60 * 1000;
 /** How soon after starting we refresh so the server's "building your report" state takes over. */
 const EARLY_REFRESH_MS = 2500;
