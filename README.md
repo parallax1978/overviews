@@ -65,7 +65,7 @@ To rebuild the report and draft for a real keyword exactly as the app does (for 
 prompt change):
 
 ```
-npx tsx scripts/run-analysis.ts <tracker-id>
+npx tsx --conditions=react-server scripts/run-analysis.ts <tracker-id>
 ```
 
 ### 4. Environment variables

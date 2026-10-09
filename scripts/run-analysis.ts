@@ -3,25 +3,25 @@
  * (same Claude calls, same database writes). For operators: validating a
  * prompt change on a real keyword, or re-running a report by hand.
  *
- *   npx tsx scripts/run-analysis.ts <tracker-id> [--draft-only]
+ *   npx tsx --conditions=react-server scripts/run-analysis.ts <tracker-id> [--draft-only]
+ *
+ * The react-server condition makes the "server-only" guard in lib/supabase/admin.ts
+ * resolve to its empty build, which is what a Node script needs.
  *
  * Reads Supabase and Anthropic settings from .env.local. Costs about $0.60
  * for the report and $0.25 for the draft.
  */
 import { existsSync } from "node:fs";
-import { register } from "node:module";
 import path from "node:path";
 
 const root = path.resolve(path.dirname(new URL(import.meta.url).pathname), "..");
 const envFile = path.join(root, ".env.local");
 if (existsSync(envFile)) process.loadEnvFile(envFile);
-// lib/analyze.ts pulls in the admin Supabase client, which is marked server-only.
-register("./_server-only-shim.mjs", import.meta.url);
 
 async function main() {
   const trackerId = process.argv[2];
   const draftOnly = process.argv.includes("--draft-only");
-  if (!trackerId) throw new Error("Usage: npx tsx scripts/run-analysis.ts <tracker-id> [--draft-only]");
+  if (!trackerId) throw new Error("Usage: npx tsx --conditions=react-server scripts/run-analysis.ts <tracker-id> [--draft-only]");
 
   const { regenerateDraft, runAnalysis } = await import("../lib/analyze");
 
