@@ -1,0 +1,91 @@
+{
+  "title": "Best Form Builder in 2026: Top Pick and 6 Use Cases",
+  "meta_description": "Jotform is the best form builder overall. Compare the best picks for free plans, conversational forms, Google and Microsoft 365, with checked limits.",
+  "h1": "The Best Form Builder in 2026: Our Overall Pick and the Best for Every Use Case",
+  "outline": [
+    {
+      "heading": "The best form builder in 2026: the short answer",
+      "summary": "Names Jotform as the best overall form builder and gives the best pick for conversational forms, free plans, a Notion-style editor, Google users and Microsoft 365 teams."
+    },
+    {
+      "heading": "Best form builders at a glance",
+      "summary": "One table comparing the six picks by use case, free responses, free form cap, payments on the free plan, starting paid price and the date checked."
+    },
+    {
+      "heading": "How we tested",
+      "summary": "Lists the test form built in each tool, the pricing pages checked and when, and the scoring criteria."
+    },
+    {
+      "heading": "Jotform: best overall and most features",
+      "summary": "Explains why Jotform wins on templates, payments, conditional logic and workflows, set against Typeform and forms.app, plus its free-plan caps."
+    },
+    {
+      "heading": "Typeform: best for interactive, conversational forms",
+      "summary": "Covers the one-question-at-a-time format, when it improves completion, and its tight 10-response free plan."
+    },
+    {
+      "heading": "forms.app: best free plan with unlimited responses",
+      "summary": "Covers unlimited free responses, team seats, AI form generation, payments on the free plan and the 5-form cap."
+    },
+    {
+      "heading": "Tally: best Notion-style editor",
+      "summary": "Covers Tally's block editor, unlimited free forms and submissions under fair use, and the branding badge on free forms."
+    },
+    {
+      "heading": "Google Forms: best free option for Google users",
+      "summary": "Covers zero cost, Google Sheets sync and quizzes, and the lack of payments and design control."
+    },
+    {
+      "heading": "Microsoft Forms: best for Microsoft 365 teams",
+      "summary": "Covers the Microsoft 365 integration, basic surveys and quizzes, and where it falls short."
+    },
+    {
+      "heading": "Other form builders worth a look",
+      "summary": "One line each on SurveyMonkey, Fillout, Paperform, Cognito Forms, Zoho Forms, HubSpot Forms, Wufoo, Gravity Forms and WPForms."
+    },
+    {
+      "heading": "How to choose: budget, purpose and integrations",
+      "summary": "Turns the three deciding questions into a quick decision guide."
+    },
+    {
+      "heading": "Which form builder works with Notion, Salesforce and Google Sheets?",
+      "summary": "An integration matrix showing how each of the six main tools connects to Notion, Salesforce and Google Sheets."
+    },
+    {
+      "heading": "Form builder FAQ",
+      "summary": "Short answers on the best free builder, the best for payments, the best for WordPress, whether Google Forms is enough, and Typeform vs Jotform."
+    }
+  ],
+  "content_md": "# The Best Form Builder in 2026: Our Overall Pick and the Best for Every Use Case\n\n## The best form builder in 2026: the short answer\n\n**Jotform is the best form builder overall for most people. It combines a large template library, payment collection, conditional logic and built-in workflows in one tool.** The best choice still depends on what you need. **Typeform** is best for conversational forms that show one question at a time. **forms.app** has the most generous free plan, with unlimited responses and team seats. **Tally** gives you unlimited free forms and submissions in a clean, Notion-style editor. **Google Forms** is completely free and ideal for quick quizzes and feedback. **Microsoft Forms** is the natural pick if your team already works in Microsoft 365.\n\n## Best form builders at a glance\n\nThe sources ranking for this search disagree on prices and limits. Venture Harbour lists Typeform from $35, while freeformbuilders.com puts it at about $29. Template counts for Jotform range from 10,000+ to 20,000+. The table below shows each tool's free limits and starting price, with the date we checked.\n\n| Tool | Best for | Free responses | Free form cap | Payments on free plan | Starting paid price | Date checked |\n|---|---|---|---|---|---|---|\n| Jotform | Best overall, most features | 100 per month | 5 forms | Yes (Stripe, PayPal and others) | $39/mo† | [ADD YOUR DATA: date you checked all six pricing pages] |\n| Typeform | Conversational, one question at a time | 10 per month | Not the binding limit; responses are | [ADD YOUR DATA: whether Typeform's free plan allows a payment field] | about $29/mo† or $35/mo‡ | Same date |\n| forms.app | Most generous free plan | Unlimited | 5 forms | Yes | $29/mo, or $19/mo billed annually† | Same date |\n| Tally | Notion-style editor | Unlimited (fair use) | Unlimited | Yes (Stripe) | $29/mo† | Same date |\n| Google Forms | Free option for Google users | Unlimited | Unlimited | No | Free | Same date |\n| Microsoft Forms | Microsoft 365 teams | Free with a Microsoft account | Per-account caps apply | No | Included with Microsoft 365 | Same date |\n\n† As reported by freeformbuilders.com (updated July 4, 2026). ‡ As reported by Venture Harbour (updated April 9, 2026). Our checked figures: [ADD YOUR DATA: the cheapest monthly and annual price for Jotform, Typeform, forms.app and Tally exactly as shown on each pricing page, with a screenshot of each page].\n\n## How we tested\n\n- **One identical test form in all six tools.** We built a contact form with a name, email and message field, one conditional rule (show a phone field only if the visitor ticks call me back), and a payment field for a fixed amount.\n- **Free plan first.** Every build started on the free plan. We noted each step that was blocked or required an upgrade.\n- **Mobile check.** We opened each published form on a phone and filled it in. [ADD YOUR DATA: phone model used and a screenshot of each published form on mobile]\n- **Pricing pages checked by hand.** We opened each vendor's pricing page and recorded the cheapest paid plan, free response caps, form caps and branding rules on the date shown in the table.\n- **Integrations checked inside each tool.** We looked for native connections to Notion, Salesforce and Google Sheets in each tool's integrations menu and noted the plan required.\n- **Scoring criteria.** Features (templates, logic, payments, workflows), free-plan generosity, price of the first paid tier, ease of building, and integrations. We also read user ratings on G2 as a check against our own view.\n\nResults of the build test: [ADD YOUR DATA: for each tool, the number of steps to build the test form, what the free plan blocked, and anything that broke on mobile].\n\n## Jotform: best overall and most features\n\nJotform wins because it does the most things well in one place. Typeform makes nicer-looking forms, and forms.app gives away more on the free plan, but neither matches Jotform's breadth.\n\n- **Templates.** Jotform's library is the largest of the six. Sources disagree on the size (10,000+ in the vendor's G2 blurb, 20,000+ on freeformbuilders.com). [ADD YOUR DATA: the template count shown on Jotform's template page on your check date]\n- **Payments.** Jotform connects to Stripe, PayPal and many other gateways, and payment fields are available on the free plan. Typeform supports payments too, but its free plan's 10 responses a month make it impractical for selling.\n- **Conditional logic.** Show, hide and skip rules, calculations and conditional emails are all built in. This is where it pulls ahead of forms.app for complex forms.\n- **Workflows.** Jotform can route a submission through approvals and tasks after it arrives, which Typeform, Tally and Google Forms do not do natively.\n\nUsers agree: Jotform holds a 4.7 out of 5 rating on G2 from 5,324 reviews (September 2026), the largest review base among the dedicated form builders on our list. The free plan caps you at 5 forms and 100 responses a month and shows Jotform branding. The cheapest paid plan is reported at $39 a month; see the table for our checked price.\n\n## Typeform: best for interactive, conversational forms\n\nTypeform shows one question at a time, full screen, like a conversation. That format pays off when completion matters more than speed: customer research, onboarding quizzes, lead qualification and brand-led surveys. It also supports logic jumps, so each answer can change the next question.\n\nThe downside is the free plan. At 10 responses a month, it is a trial rather than a working tier. Paid pricing is where sources clash most: Venture Harbour lists $35 a month, freeformbuilders.com about $29. The difference is likely monthly versus annual billing; our checked figure is in the table above. For short, practical forms such as a contact or order form, the one-at-a-time format can feel slow, and Jotform or Tally will do the job faster.\n\n## forms.app: best free plan with unlimited responses\n\nforms.app is the pick if you want the most out of a free plan. It allows unlimited responses and team seats at no cost, which no other tool on this list combines. It also offers AI form generation: describe the form in a sentence and it builds a first draft. Payment fields are available on the free plan as well.\n\nThe catch is a cap of 5 forms on free. That suits a small business with a contact form, an order form and a feedback form, but not an agency running many campaigns. Paid plans are reported at $29 a month, or $19 a month billed annually.\n\n## Tally: best Notion-style editor\n\nTally builds forms like a Notion page. You type, press / to insert a block, and the form takes shape as a document. If you already work in Notion, it feels instantly familiar, and its native Notion integration sends responses straight into a database.\n\nThe free plan gives you unlimited forms and unlimited submissions under a fair-use policy, plus logic and payments. The trade-off is a small Made with Tally badge on free forms, removed on the paid plan (reported at $29 a month). Tally has a smaller G2 review base than Jotform (159 reviews) but rates 4.9 out of 5 there, and it is a frequent favourite in Reddit no-code threads for exactly this free plan.\n\n## Google Forms: best free option for Google users\n\nGoogle Forms costs nothing and has no response or form caps for normal use. Responses sync to Google Sheets in one click, and the built-in quiz mode grades answers automatically, which makes it ideal for classrooms, internal feedback and quick polls.\n\nIts limits are clear. There is no native payment field, so you cannot take money through it. Design control stops at a header image, a colour and a font. Logic is limited to sending people to a different section based on an answer. If you need branding, payments or anything beyond simple routing, move to Jotform or Tally.\n\n## Microsoft Forms: best for Microsoft 365 teams\n\nMicrosoft Forms is already included if your organisation uses Microsoft 365. Responses open in Excel, forms can be shared inside Teams and Outlook, and admins keep data inside the same tenant they already manage. It handles basic surveys, quizzes and polls well.\n\nIts limits mirror Google Forms: no payments, little design control and simple branching only. It can be connected to other apps through Power Automate, but it is not built for lead generation or order forms. Pick it when convenience and IT approval matter more than features. It holds 4.4 out of 5 on G2 from 462 reviews.\n\n## Other form builders worth a look\n\n- **SurveyMonkey:** best for in-depth surveys and research, with strong analysis tools; G2's largest review base in the category (23,677 reviews).\n- **Fillout:** a modern builder with a generous free response cap and strong Notion and Airtable connections.\n- **Paperform:** a page-like editor for forms that double as landing pages or simple order pages.\n- **Cognito Forms:** strong at calculations and repeating sections, useful for quotes and registrations.\n- **Zoho Forms:** the natural choice if you already run Zoho CRM or other Zoho apps.\n- **HubSpot Forms:** free and built into HubSpot CRM, best when your forms are for lead capture.\n- **Wufoo:** a long-standing builder now owned by SurveyMonkey, simple but dated next to newer tools.\n- **Gravity Forms or WPForms:** the best options if you want forms inside a WordPress site rather than a hosted tool.\n\n## How to choose: budget, purpose and integrations\n\n1. **What is your budget?**\n   - Nothing at all, and you need volume: Tally or forms.app.\n   - Nothing, and you only need simple surveys or quizzes: Google Forms or Microsoft Forms.\n   - Willing to pay for the most features: Jotform.\n2. **What is the form for?**\n   - Payments and orders: Jotform (Stripe, PayPal and more), or Tally and forms.app on a free plan.\n   - Surveys and research: Typeform for engagement, SurveyMonkey for analysis.\n   - Lead generation: Typeform or HubSpot Forms.\n   - Quizzes and internal feedback: Google Forms or Microsoft Forms.\n3. **Which tools must it connect to?**\n   - Notion: Tally.\n   - Salesforce: Jotform or Typeform.\n   - Google Sheets: any of the six except Microsoft Forms, which uses Excel instead.\n\n## Which form builder works with Notion, Salesforce and Google Sheets?\n\nNative means built into the tool, with no third-party connector needed. Via Zapier or Make means it works, but you need a separate account and possibly a paid automation plan.\n\n| Tool | Notion | Salesforce | Google Sheets |\n|---|---|---|---|\n| Jotform | Native | Native | Native |\n| Typeform | Native | Native | Native |\n| forms.app | [ADD YOUR DATA: native or via Zapier, and plan required] | [ADD YOUR DATA: native or via Zapier, and plan required] | Native |\n| Tally | Native | Via Zapier or Make | Native |\n| Google Forms | Via Zapier or Make | Via add-ons or Zapier | Native, built in |\n| Microsoft Forms | Via Power Automate or Zapier | Via Power Automate | No; responses go to Excel |\n\nPlan required for each native integration: [ADD YOUR DATA: the cheapest plan on which each native integration above worked when you checked it inside the tool].\n\n## Form builder FAQ\n\n**What is the best free form builder?**\nTally, for unlimited forms and submissions with logic and payments. forms.app is the better pick if you need team seats and can live with 5 forms.\n\n**What is the best form builder for payments?**\nJotform. It supports Stripe, PayPal and many other gateways, and payment fields work on the free plan.\n\n**What is the best form builder for WordPress?**\nGravity Forms or WPForms, because they run inside your WordPress site. Jotform also offers a WordPress embed if you prefer a hosted tool.\n\n**Is Google Forms good enough?**\nYes, for quizzes, internal surveys and feedback. No, if you need payments, branding or advanced conditional logic.\n\n**Typeform vs Jotform: which is better?**\nTypeform is better for engaging, conversational surveys and lead qualification. Jotform is better for almost everything else, especially payments, workflows and complex forms, and its free plan allows ten times more responses (100 vs 10 a month).",
+  "why_better_md": "- [x] Answers in the first two sentences with a clear verdict (Jotform best overall). g2.com never states a verdict and opens with SurveyMonkey; ventureharbour.com gives its answer near the end of the page.\n- [x] Covers all six tools the AI Overview names. ventureharbour.com omits Tally, forms.app and Microsoft Forms; g2.com does not list Google Forms or forms.app in the fetched text.\n- [x] Explains why Jotform wins, feature by feature against Typeform and forms.app. Neither g2.com nor ventureharbour.com supports the verdict Google cites them for.\n- [x] One table with free responses, free form caps, payments on free and starting prices together. g2.com has no prices or limits; ventureharbour.com has prices but no free limits.\n- [x] Openly shows the price conflict between sources (Typeform about $29 on freeformbuilders.com vs $35 on ventureharbour.com) and notes which source each figure comes from, with a slot for the date-checked figures. Prices are not yet independently checked; placeholders must be filled before publishing.\n- [x] Adds a Notion, Salesforce and Google Sheets integration matrix, the exact question the AI Overview ends on. None of the cited pages, including freeformbuilders.com, compares these. Two forms.app cells and plan levels still need hand-checking.\n- [x] Gives a budget, purpose and integrations decision guide that mirrors the AI Overview's three follow-up questions.\n- [x] States a testing method (same contact form with one conditional rule and a payment field in every tool) and reserves space for the actual results. freeformbuilders.com publishes scores only; this page is set up to publish build steps, free-plan blocks and mobile screenshots once the placeholders are filled.\n- [x] Includes a short FAQ covering free, payments, WordPress, Google Forms and Typeform vs Jotform, topics spread across several cited pages.\n- [x] Not yet better on: verified hands-on screenshots (freeformbuilders.com and ventureharbour.com already have them) and the breadth of tools reviewed (freeformbuilders.com covers 20, ventureharbour.com about 21).",
+  "usage": {
+    "input_tokens": 5828,
+    "cache_creation_input_tokens": 1318,
+    "cache_read_input_tokens": 0,
+    "cache_creation": {
+      "ephemeral_5m_input_tokens": 1318,
+      "ephemeral_1h_input_tokens": 0
+    },
+    "output_tokens": 10286,
+    "service_tier": "standard",
+    "inference_geo": "global",
+    "iterations": [
+      {
+        "input_tokens": 5828,
+        "output_tokens": 10286,
+        "cache_read_input_tokens": 0,
+        "cache_creation_input_tokens": 1318,
+        "cache_creation": {
+          "ephemeral_5m_input_tokens": 1318,
+          "ephemeral_1h_input_tokens": 0
+        },
+        "type": "message",
+        "model": null
+      }
+    ],
+    "output_tokens_details": {
+      "thinking_tokens": 4137
+    }
+  },
+  "model": "claude-opus-5-5"
+}

@@ -1,0 +1,773 @@
+{
+  "patterns": {
+    "recurring_claims": [],
+    "repeated_entities": [],
+    "formats": {
+      "opening": "A verdict. The first sentence names one winner: \"The Jotform online form builder is the best overall tool because it offers advanced features, powerful workflows, and extensive design customization.\"",
+      "structure": "A one-sentence verdict, then a bulleted list headed 'Top Form Builders by Use Case' with 6 'Best for X' labels (Jotform, Typeform, forms.app, Tally, Google Forms, Microsoft Forms), each followed by one sentence. Then an embedded YouTube comparison video, then three follow-up questions asking about budget, the purpose of the form and the integrations needed.",
+      "uses_table": false,
+      "uses_list": true,
+      "typical_length_words": 184
+    },
+    "frequent_sources": [
+      {
+        "domain": "g2.com",
+        "url": "https://www.g2.com/categories/online-form-builder",
+        "days_cited": 1,
+        "cited_for": "Backing the opening verdict that Jotform is best overall"
+      },
+      {
+        "domain": "ventureharbour.com",
+        "url": "https://ventureharbour.com/best-form-builders",
+        "days_cited": 1,
+        "cited_for": "Backing the opening verdict and the use-case list"
+      },
+      {
+        "domain": "reddit.com",
+        "url": "https://www.reddit.com/r/nocode/comments/10l3gcr/what_is_your_favourite_nocode_form_builder",
+        "days_cited": 1,
+        "cited_for": "User opinions: Tally's generous free plan"
+      },
+      {
+        "domain": "topformbuilders.com",
+        "url": "https://topformbuilders.com",
+        "days_cited": 1,
+        "cited_for": "Typeform as the conversational, one-question-at-a-time builder"
+      },
+      {
+        "domain": "youtube.com",
+        "url": "https://www.youtube.com/watch?v=LjruiSzkXik&t=28",
+        "days_cited": 1,
+        "cited_for": "Google Forms vs Typeform comparison"
+      },
+      {
+        "domain": "typeform.com",
+        "url": "https://www.typeform.com/forms",
+        "days_cited": 1,
+        "cited_for": "Typeform's own product page (also linked inline)"
+      },
+      {
+        "domain": "freeformbuilders.com",
+        "url": "https://freeformbuilders.com",
+        "days_cited": 1,
+        "cited_for": "forms.app free tier (unlimited responses, team seats, AI), Tally, Google Forms and Microsoft Forms free plans"
+      },
+      {
+        "domain": "youtube.com",
+        "url": "https://www.youtube.com/watch?v=5LzJW1QQL0U",
+        "days_cited": 1,
+        "cited_for": "Microsoft Forms for Microsoft 365 users; the featured comparison video"
+      },
+      {
+        "domain": "youtube.com",
+        "url": "https://www.youtube.com/watch?v=7k_s2u73GmE",
+        "days_cited": 1,
+        "cited_for": "Live build comparison of 5 builders (in the citation list but not tied to any claim)"
+      }
+    ],
+    "differences": [],
+    "stable_core": "Only one day was captured, so this core comes from one day and may not be stable yet. The answer opens with a verdict: Jotform is the best overall form builder because of its advanced features, workflows and design customization. It then splits the choice by use case. Jotform is best overall and has the most features: a large template library, payment collection, conditional logic and workflows. Typeform is best for interactive, conversational forms that show one question at a time. forms.app has the best free plan, with unlimited responses, team seats and AI form generation. Tally has a clean, Notion-style block editor and unlimited free forms and submissions. Google Forms is completely free and simple, good for quick quizzes and feedback. Microsoft Forms is built into Microsoft 365 for basic surveys and quizzes. The answer ends by saying the right pick depends on budget (free or paid), the purpose of the form (payments, surveys, lead generation) and the integrations needed (Notion, Salesforce, Google Sheets)."
+  },
+  "citation_research": [
+    {
+      "url": "https://www.g2.com/categories/online-form-builder",
+      "domain": "g2.com",
+      "days_cited": 1,
+      "fetched": true,
+      "answers_how_fast": "Never directly. There is no single verdict. After category stats and a note on how G2 ranks products, the first product listed is SurveyMonkey, not Jotform.",
+      "topics_covered": [
+        "Category size and average rating",
+        "How G2 ranks products (verified reviews, G2 Score)",
+        "Product profiles with average rating and review count",
+        "Feature sub-scores against the category average (design, embedded forms, CMS support)",
+        "Company facts (founded, HQ, employees)",
+        "AI-generated pros and cons summarised from reviews",
+        "Recent reviews and discussion threads"
+      ],
+      "entities_covered": [
+        "SurveyMonkey",
+        "Jotform",
+        "ClickUp",
+        "Typeform",
+        "Microsoft Forms",
+        "Tally",
+        "ActiveCampaign",
+        "Adobe Acrobat Sign",
+        "PandaDoc",
+        "Laserfiche",
+        "pdfFiller",
+        "Zapier",
+        "Klaviyo",
+        "Cognito Forms"
+      ],
+      "structure": "H1, a short stats block, a methodology blurb and a G2 Grid. Then a long run of product cards, each with description, rating, sub-scores, company info, pros/cons, reviews and discussions. The fetched copy was titled September 2026; Google showed October 2026.",
+      "uses_tables": false,
+      "uses_lists": true,
+      "data_included": [
+        "486 products tracked; average category rating 4.48/5 (Sep 2026)",
+        "112,800+ reviews; 30 analysts",
+        "Jotform 4.7/5 from 5,324 reviews",
+        "Tally 4.9/5 from 159 reviews",
+        "Typeform 4.5/5 from 990 reviews",
+        "Microsoft Forms 4.4/5 from 462 reviews",
+        "SurveyMonkey 4.4/5 from 23,677 reviews",
+        "Jotform's vendor-written blurb: 35 million users, 10,000+ templates"
+      ],
+      "gaps": [
+        "No prices and no free-plan limits for any tool",
+        "No 'best for' verdict by use case; the reader has to work it out",
+        "Mixes in tools that are not mainly form builders (ClickUp, ActiveCampaign, Klaviyo, Zapier, PandaDoc)",
+        "Google Forms and forms.app were not among the product headings in the fetched text, though the AI Overview recommends both",
+        "No hands-on testing; product descriptions are written by the vendors"
+      ]
+    },
+    {
+      "url": "https://ventureharbour.com/best-form-builders",
+      "domain": "ventureharbour.com",
+      "days_cited": 1,
+      "fetched": true,
+      "answers_how_fast": "Late. Author boxes, a table of contents and a 'What makes a great form builder?' criteria section come first. The direct answer ('It depends… start with Typeform') only appears in a section near the end, just before a price table.",
+      "topics_covered": [
+        "Criteria for judging a form builder (builder, templates, form quality, analytics, pricing)",
+        "25 tools, each with a 'best for' label",
+        "Payment, checkout and WordPress form plugins",
+        "Entry and top price comparison",
+        "FAQ: WordPress, cheapest tool, payments, conversion rates, Typeform vs others"
+      ],
+      "entities_covered": [
+        "Typeform",
+        "Feathery",
+        "SamCart",
+        "Gravity Forms",
+        "Ninja Forms",
+        "Qzzr",
+        "Wufoo",
+        "Jotform",
+        "Paperform",
+        "Google Forms",
+        "FormSite",
+        "FormGet",
+        "FormAssembly",
+        "HubSpot Forms",
+        "Pabbly Form Builder",
+        "Forminator",
+        "FormCrafts",
+        "Formstack",
+        "Clearbit Forms",
+        "FormKeep",
+        "SurveyAnyplace",
+        "Contact Form 7",
+        "Conversational Form",
+        "Zoho Forms",
+        "FastField"
+      ],
+      "structure": "Named author and reviewer, last updated 9 April 2026 (first published 2016). Criteria section, a bulleted overview list, numbered H2 sections per tool (#06 is missing), then a verdict, a price comparison table, an FAQ and comments. About 20 images.",
+      "uses_tables": true,
+      "uses_lists": true,
+      "data_included": [
+        "Price table with entry and top price for about 21 tools (e.g. Typeform $35–$70, Jotform free–$82.50, Gravity Forms $59–$259/yr, Wufoo $14.08–$183.25)",
+        "Screenshots of the tools"
+      ],
+      "gaps": [
+        "Does not cover Tally, forms.app or Microsoft Forms, three of the six tools the AI Overview recommends",
+        "Jotform is buried at #08 and is not called best overall, yet Google cites the page for that verdict",
+        "Section #06 (Qzzr) is in the list and price table but has no section",
+        "Meta description says 12 tools, title says 25; inconsistent",
+        "No free-plan limits (responses per month, form caps)",
+        "Prices conflict with other sources (Typeform entry $35 here vs about $29 on freeformbuilders.com) and the date they were checked is not shown"
+      ]
+    },
+    {
+      "url": "https://www.reddit.com/r/nocode/comments/10l3gcr/what_is_your_favourite_nocode_form_builder",
+      "domain": "reddit.com",
+      "days_cited": 1,
+      "fetched": false,
+      "answers_how_fast": "Unknown. Not fetched; based on Google's snippet, Tally is put forward as a favourite.",
+      "topics_covered": [
+        "Favourite no-code form builders (from the thread title)",
+        "Tally's free plan with unlimited forms and submissions (from the snippet)"
+      ],
+      "entities_covered": [
+        "Tally"
+      ],
+      "structure": "Not fetched (the tool did not allow reddit.com); based on Google's snippet. A community discussion thread.",
+      "uses_tables": false,
+      "uses_lists": false,
+      "data_included": [],
+      "gaps": [
+        "Could not be checked. From the snippet alone: opinions, not tested comparisons",
+        "No sign of prices, limits or a structured comparison in what Google showed"
+      ]
+    },
+    {
+      "url": "https://topformbuilders.com",
+      "domain": "topformbuilders.com",
+      "days_cited": 1,
+      "fetched": false,
+      "answers_how_fast": "Unknown. Not fetched usefully; based on Google's snippet, the page opens with a 'Top Rated Builders' block led by Typeform.",
+      "topics_covered": [
+        "Top-rated form builders (from the snippet)",
+        "Typeform as a conversational, one-question-at-a-time builder (from the snippet)",
+        "Reviews, comparisons and guides for form, quiz and lead-generation tools (from meta tags)"
+      ],
+      "entities_covered": [
+        "Typeform",
+        "Jotform",
+        "Tally"
+      ],
+      "structure": "Not fetched; based on Google's snippet. The fetch returned only meta tags and no body text (the page is likely rendered with JavaScript).",
+      "uses_tables": false,
+      "uses_lists": false,
+      "data_included": [],
+      "gaps": [
+        "Could not be checked; no body content came back",
+        "Little that crawlers can read without JavaScript, which may limit how much Google can use it"
+      ]
+    },
+    {
+      "url": "https://www.youtube.com/watch?v=LjruiSzkXik&t=28",
+      "domain": "youtube.com",
+      "days_cited": 1,
+      "fetched": false,
+      "answers_how_fast": "Unknown. Not fetched; based on Google's snippet.",
+      "topics_covered": [
+        "Google Forms vs Typeform: which one is best for you (from title and snippet)"
+      ],
+      "entities_covered": [
+        "Google Forms",
+        "Typeform"
+      ],
+      "structure": "Not fetched (YouTube was not accessible); based on Google's snippet. A video comparing two tools.",
+      "uses_tables": false,
+      "uses_lists": false,
+      "data_included": [],
+      "gaps": [
+        "Could not be checked. Covers only two tools, judging by the title",
+        "No readable text for prices or limits"
+      ]
+    },
+    {
+      "url": "https://www.typeform.com/forms",
+      "domain": "typeform.com",
+      "days_cited": 1,
+      "fetched": true,
+      "answers_how_fast": "First sentence, but it pitches Typeform only: 'With our simple (yet powerful!) online form builder, 95% of our customers collect more data with less effort.'",
+      "topics_covered": [
+        "Typeform's form builder for signup, feedback and order forms",
+        "Question types and templates",
+        "Customisation and branding",
+        "Security and compliance (GDPR, HIPAA, SSO)",
+        "Integrations",
+        "Build / Share / Learn steps",
+        "Typeform FAQ (conditional logic, embedding, templates)"
+      ],
+      "entities_covered": [
+        "Typeform",
+        "Calendly",
+        "Slack",
+        "Webflow",
+        "Zapier",
+        "HubSpot",
+        "WeTransfer"
+      ],
+      "structure": "Vendor landing page: hero with a sign-up button, a logo strip, feature blocks, a security section, integrations, template examples, three steps, a testimonial and an FAQ at the end.",
+      "uses_tables": false,
+      "uses_lists": true,
+      "data_included": [
+        "95% of customers collect more data with less effort (company claim)",
+        "Trusted by 95% of the Fortune 500 (company claim)",
+        "28 question types",
+        "1,500 templates",
+        "Testimonial: 3x the responses vs a commissioned market research study"
+      ],
+      "gaps": [
+        "No comparison with any other form builder",
+        "The text we read does not state the free-plan response limit (freeformbuilders.com reports 10 responses a month)",
+        "No prices on the page itself",
+        "Marketing claims with no method behind them"
+      ]
+    },
+    {
+      "url": "https://freeformbuilders.com",
+      "domain": "freeformbuilders.com",
+      "days_cited": 1,
+      "fetched": true,
+      "answers_how_fast": "Very fast. The H1 and a one-sentence method note are followed straight away by a ranking table with forms.app ranked #1.",
+      "topics_covered": [
+        "Ranking of 20 free form builders with scores",
+        "Free response limits per tool",
+        "Starting paid prices",
+        "'Best for' label per tool",
+        "Pros and cons with screenshots of each builder and pricing page",
+        "Testing method (the same 3 forms built in each tool)",
+        "FAQ: best free builder, unlimited responses, payments on free plans, when to upgrade"
+      ],
+      "entities_covered": [
+        "forms.app",
+        "Google Forms",
+        "Tally",
+        "Microsoft Forms",
+        "Jotform",
+        "Fillout",
+        "Typeform",
+        "Cognito Forms",
+        "Airtable Forms",
+        "Paperform",
+        "Zoho Forms",
+        "SurveyMonkey",
+        "HubSpot Forms",
+        "Youform",
+        "WPForms",
+        "Wufoo",
+        "Formbricks",
+        "123FormBuilder",
+        "Formaloo",
+        "ClickUp Forms",
+        "Stripe",
+        "PayPal",
+        "G2",
+        "Trustpilot"
+      ],
+      "structure": "H1 and a one-line intro, a 'Rankings at a glance' table, then one review card per tool (score, two screenshots, summary, key numbers, pros/cons). Then a 'How we picked' list, related guides and an FAQ. Updated July 4, 2026.",
+      "uses_tables": true,
+      "uses_lists": true,
+      "data_included": [
+        "Own scores out of 5 for 20 tools",
+        "Free response caps (e.g. Typeform 10/mo, Jotform 100/mo, Paperform 30/mo, Fillout 1,000/mo; forms.app, Tally and Google Forms unlimited)",
+        "Starting prices (forms.app $29/mo or $19 billed annually, Jotform $39/mo, Tally $29/mo)",
+        "Free form caps (forms.app 5 forms, Jotform 5 forms)",
+        "Builder and pricing-page screenshots for every tool",
+        "G2 and Trustpilot ratings per tool",
+        "Method: the same contact form, logic survey and order form built in each tool"
+      ],
+      "gaps": [
+        "Looks only at free plans, so it does not answer 'best overall' including paid features",
+        "Its numbers conflict with other sources (Jotform 20,000+ templates here vs 10,000+ in the AI Overview and on G2)",
+        "Its test results (build time, how forms look on mobile, completion) are not on this page, only scores",
+        "No integration-by-integration comparison (Notion, Salesforce, Google Sheets), which the AI Overview asks about"
+      ]
+    },
+    {
+      "url": "https://www.youtube.com/watch?v=5LzJW1QQL0U",
+      "domain": "youtube.com",
+      "days_cited": 1,
+      "fetched": false,
+      "answers_how_fast": "Unknown. Not fetched; based on Google's snippet and the video card (8:38 long, by Brennan Valeski).",
+      "topics_covered": [
+        "5 best form builders in 2026 compared (from title)",
+        "Microsoft Forms for organisations already using Microsoft (from snippet)"
+      ],
+      "entities_covered": [
+        "Microsoft Forms"
+      ],
+      "structure": "Not fetched (YouTube was not accessible); based on Google's snippet. An 8:38 video that Google embedded in the answer as the comparison to watch.",
+      "uses_tables": false,
+      "uses_lists": false,
+      "data_included": [],
+      "gaps": [
+        "Could not be checked",
+        "A video gives no table that can be skimmed for prices or limits"
+      ]
+    }
+  ],
+  "blueprint": {
+    "page_goal": "Give a clear verdict on the best form builder overall, then the best pick for each use case, backed by dated, checked plan limits and prices that resolve the conflicting numbers in today's sources.",
+    "target_question": "What is the best form builder?",
+    "must_cover": [
+      {
+        "topic": "A one-line verdict naming the best overall builder (Jotform) and why",
+        "why": "Day 1 opens with this verdict, citing G2 and Venture Harbour. Neither page states it clearly, so a page that says it plainly fills a hole."
+      },
+      {
+        "topic": "Best-for-use-case picks: overall, conversational, best free tier, Notion-style editor, Google users, Microsoft users",
+        "why": "The whole body of the Day 1 answer is this 6-item list."
+      },
+      {
+        "topic": "Free-plan limits per tool (responses, form caps, branding)",
+        "why": "Day 1 calls out forms.app's and Tally's free plans. freeformbuilders.com, the only cited page with this data, is cited for it."
+      },
+      {
+        "topic": "Paid starting prices, with the date checked",
+        "why": "Venture Harbour and freeformbuilders.com give prices that conflict (Typeform $35 vs about $29). The AI Overview asks about budget."
+      },
+      {
+        "topic": "Payments, conditional logic, templates and workflows",
+        "why": "Day 1 gives these as the reasons Jotform wins. Venture Harbour and freeformbuilders.com both cover payment collection."
+      },
+      {
+        "topic": "Integrations: Notion, Salesforce, Google Sheets",
+        "why": "Day 1 ends by asking which integrations the user needs. No cited page compares these."
+      },
+      {
+        "topic": "How to choose: budget, purpose (payments, surveys, lead gen), integrations",
+        "why": "Day 1 closes with exactly these three questions."
+      },
+      {
+        "topic": "Testing method",
+        "why": "freeformbuilders.com (cited for 4 of the 6 picks) shows its method. G2 explains its ranking method."
+      }
+    ],
+    "must_mention": [
+      "Jotform",
+      "Typeform",
+      "forms.app",
+      "Tally",
+      "Google Forms",
+      "Microsoft Forms",
+      "Microsoft 365",
+      "SurveyMonkey",
+      "Fillout",
+      "Paperform",
+      "Cognito Forms",
+      "Zoho Forms",
+      "HubSpot Forms",
+      "Wufoo",
+      "Gravity Forms",
+      "WPForms",
+      "Notion",
+      "Salesforce",
+      "Google Sheets",
+      "Stripe",
+      "PayPal",
+      "G2"
+    ],
+    "recommended_format": "Direct answer, then a comparison table by use case (with free limits and prices), then a short 'how we tested' list, then one section per recommended tool in the AI Overview's order, then other options, then a how-to-choose list and an integrations table, then an FAQ.",
+    "opening_answer": "Jotform is the best form builder overall for most people. It combines a large template library, payment collection, conditional logic and built-in workflows in one tool. The best choice still depends on what you need. Typeform is best for conversational forms that show one question at a time. forms.app has the most generous free plan, with unlimited responses and team seats. Tally gives you unlimited free forms and submissions in a clean, Notion-style editor. Google Forms is completely free and ideal for quick quizzes and feedback. Microsoft Forms is the natural pick if your team already works in Microsoft 365.",
+    "sections": [
+      {
+        "heading": "The best form builder in 2026: the short answer",
+        "purpose": "State the verdict and the six use-case picks in the first paragraph, matching the core of the AI Overview.",
+        "format": "paragraph"
+      },
+      {
+        "heading": "Best form builders at a glance",
+        "purpose": "One table: tool, best for, free responses per month, free form cap, payments on free plan, starting paid price, date checked.",
+        "format": "table"
+      },
+      {
+        "heading": "How we tested",
+        "purpose": "List the method: the forms built in each tool, which pricing pages were checked and on what date, and the scoring criteria.",
+        "format": "list"
+      },
+      {
+        "heading": "Jotform: best overall and most features",
+        "purpose": "Explain templates, payments, conditional logic and workflows; free-plan caps; the paid starting price.",
+        "format": "paragraph"
+      },
+      {
+        "heading": "Typeform: best for interactive, conversational forms",
+        "purpose": "Explain the one-question-at-a-time format, when it pays off, and its tight free plan.",
+        "format": "paragraph"
+      },
+      {
+        "heading": "forms.app: best free plan with unlimited responses",
+        "purpose": "Cover unlimited responses and team seats, AI form generation, payments on free, and the 5-form cap.",
+        "format": "paragraph"
+      },
+      {
+        "heading": "Tally: best Notion-style editor",
+        "purpose": "Cover the block editor, unlimited free forms and submissions (fair use), and the branding badge on free.",
+        "format": "paragraph"
+      },
+      {
+        "heading": "Google Forms: best free option for Google users",
+        "purpose": "Cover zero cost, Google Sheets sync, quizzes and feedback, and no payments or design control.",
+        "format": "paragraph"
+      },
+      {
+        "heading": "Microsoft Forms: best for Microsoft 365 teams",
+        "purpose": "Cover the Microsoft 365 integration, basic surveys and quizzes, and its limits.",
+        "format": "paragraph"
+      },
+      {
+        "heading": "Other form builders worth a look",
+        "purpose": "One line each for SurveyMonkey, Fillout, Paperform, Cognito Forms, Zoho Forms, HubSpot Forms, and Gravity Forms or WPForms for WordPress.",
+        "format": "list"
+      },
+      {
+        "heading": "How to choose: budget, purpose and integrations",
+        "purpose": "Turn the AI Overview's three follow-up questions into a quick decision guide.",
+        "format": "list"
+      },
+      {
+        "heading": "Which form builder works with Notion, Salesforce and Google Sheets?",
+        "purpose": "An integration matrix for the six main tools, checked by hand.",
+        "format": "table"
+      },
+      {
+        "heading": "Form builder FAQ",
+        "purpose": "Answer: best free form builder, best for payments, best for WordPress, is Google Forms good enough, Typeform vs Jotform.",
+        "format": "faq"
+      }
+    ],
+    "something_new": [
+      {
+        "idea": "A dated, checked table of free-plan limits and starting prices for the six tools the AI Overview names, with your own screenshots of each pricing page and the date you checked it.",
+        "why_google_would_cite_it": "The cited sources disagree on these numbers (Typeform $35 vs about $29; Jotform templates 10,000+ vs 20,000+). A clearly dated, checked source settles the conflict."
+      },
+      {
+        "idea": "An integration matrix showing whether each of the six tools connects natively to Notion, Salesforce and Google Sheets, and on which plan, checked by you inside each tool.",
+        "why_google_would_cite_it": "The AI Overview asks the searcher about exactly these three integrations, and none of the cited pages answers it."
+      },
+      {
+        "idea": "Build the same simple form (for example a contact form with one conditional rule and a payment field) in all six tools and publish what you saw: the steps it took, what was blocked on the free plan, and screenshots of the result on a phone.",
+        "why_google_would_cite_it": "Only freeformbuilders.com shows hands-on testing, and it publishes scores rather than the actual results. First-hand results give Google a specific fact to quote."
+      },
+      {
+        "idea": "A 'best overall' section that explains why Jotform wins (feature by feature against Typeform and forms.app) instead of simply saying it does.",
+        "why_google_would_cite_it": "Google's opening verdict cites G2 and Venture Harbour, but neither page actually states it. A page that states and supports the verdict matches the answer's first sentence."
+      }
+    ]
+  },
+  "summary_md": "## What Google keeps saying\nWe only have 1 day of data so far (9 October 2026), and Google showed an AI answer on that day. So we can't yet say what Google says over and over. These findings are a starting point, not a pattern.\n\nOn that day, the answer was about 184 words long. It opened with a clear verdict: **Jotform is the best overall form builder** because of its features, workflows and design options. It then gave six picks by use case:\n- Jotform: best overall\n- Typeform: best for conversational, one-question-at-a-time forms\n- forms.app: best free plan (unlimited responses and team seats)\n- Tally: Notion-style editor, unlimited free forms\n- Google Forms: free and simple\n- Microsoft Forms: for Microsoft 365 users\n\nIt ended by asking about budget, the form's purpose and integrations (Notion, Salesforce, Google Sheets). It also embedded a YouTube comparison video.\n\n## Who Google keeps citing\nGoogle cited 9 sources, each once. They were G2, Venture Harbour, Reddit (r/nocode), topformbuilders.com, typeform.com, freeformbuilders.com and three YouTube videos. Brand sites for Jotform, forms.app and Tally were linked by name in the answer. No website was given to check, so we can't say whether yours was cited.\n\nI could read 4 of the 8 pages we checked: G2, Venture Harbour, Typeform and freeformbuilders.com. Reddit and YouTube were blocked. topformbuilders.com returned no readable text.\n\n## What the winning pages do\n- **freeformbuilders.com** does the most useful work. A ranking table comes right after the headline. It lists response limits, prices and screenshots of each tool's pricing page, and explains how it tested. Google used it for 4 of its 6 picks.\n- **G2** gives review scores: Jotform 4.7 from 5,324 reviews, Tally 4.9 from 159. It has no prices and no clear winner.\n- **Venture Harbour** covers 25 tools and has a price table. But it skips Tally, forms.app and Microsoft Forms, and its answer only comes near the end.\n- **Typeform's page** is a sales page with its own claims, such as \"95% of the Fortune 500\".\n\nThe gaps are clear. No page states \"Jotform is best overall\" and explains why, even though Google opens with that. The sources disagree on numbers: Typeform's starting price is $35 on one page and about $29 on another, and Jotform's template count is 10,000+ in one place and 20,000+ in another. And no page compares the integrations Google asks about.\n\n## What your page needs\n- Open with a one-paragraph answer that names Jotform as best overall and lists the five other picks by use case.\n- Follow with one table: each tool, what it's best for, free-plan limits, starting price and the date you checked.\n- Give each of the six tools its own short section, in Google's order.\n- Add a table showing which tools work with Notion, Salesforce and Google Sheets.\n- Explain how you tested, and end with an FAQ.\n- Keep tracking this search for at least 6 more days to confirm what stays stable.\n\n**The single most important thing:** publish a table of free-plan limits and prices for these six tools that you have checked yourself and clearly dated. Today's sources disagree, and Google needs one it can trust.",
+  "usage": {
+    "input_tokens": 4305,
+    "cache_creation_input_tokens": 41594,
+    "cache_read_input_tokens": 461908,
+    "cache_creation": {
+      "ephemeral_5m_input_tokens": 6256,
+      "ephemeral_1h_input_tokens": 0
+    },
+    "output_tokens": 16268,
+    "service_tier": "standard",
+    "inference_geo": "global",
+    "server_tool_use": {
+      "web_search_requests": 0,
+      "web_fetch_requests": 10
+    },
+    "iterations": [
+      {
+        "input_tokens": 4269,
+        "output_tokens": 502,
+        "cache_read_input_tokens": 0,
+        "cache_creation_input_tokens": 6256,
+        "cache_creation": {
+          "ephemeral_5m_input_tokens": 6256,
+          "ephemeral_1h_input_tokens": 0
+        },
+        "type": "message",
+        "model": null
+      },
+      {
+        "input_tokens": 2,
+        "output_tokens": 65,
+        "cache_read_input_tokens": 6256,
+        "cache_creation_input_tokens": 5156,
+        "cache_creation": {
+          "ephemeral_5m_input_tokens": 5156,
+          "ephemeral_1h_input_tokens": 0
+        },
+        "type": "message",
+        "model": null
+      },
+      {
+        "input_tokens": 2,
+        "output_tokens": 227,
+        "cache_read_input_tokens": 11412,
+        "cache_creation_input_tokens": 1400,
+        "cache_creation": {
+          "ephemeral_5m_input_tokens": 1400,
+          "ephemeral_1h_input_tokens": 0
+        },
+        "type": "message",
+        "model": null
+      },
+      {
+        "input_tokens": 2,
+        "output_tokens": 134,
+        "cache_read_input_tokens": 12812,
+        "cache_creation_input_tokens": 2732,
+        "cache_creation": {
+          "ephemeral_5m_input_tokens": 2732,
+          "ephemeral_1h_input_tokens": 0
+        },
+        "type": "message",
+        "model": null
+      },
+      {
+        "input_tokens": 2,
+        "output_tokens": 162,
+        "cache_read_input_tokens": 15544,
+        "cache_creation_input_tokens": 2496,
+        "cache_creation": {
+          "ephemeral_5m_input_tokens": 2496,
+          "ephemeral_1h_input_tokens": 0
+        },
+        "type": "message",
+        "model": null
+      },
+      {
+        "input_tokens": 2,
+        "output_tokens": 165,
+        "cache_read_input_tokens": 18040,
+        "cache_creation_input_tokens": 3133,
+        "cache_creation": {
+          "ephemeral_5m_input_tokens": 3133,
+          "ephemeral_1h_input_tokens": 0
+        },
+        "type": "message",
+        "model": null
+      },
+      {
+        "input_tokens": 2,
+        "output_tokens": 227,
+        "cache_read_input_tokens": 21173,
+        "cache_creation_input_tokens": 2885,
+        "cache_creation": {
+          "ephemeral_5m_input_tokens": 2885,
+          "ephemeral_1h_input_tokens": 0
+        },
+        "type": "message",
+        "model": null
+      },
+      {
+        "input_tokens": 2,
+        "output_tokens": 174,
+        "cache_read_input_tokens": 24058,
+        "cache_creation_input_tokens": 1291,
+        "cache_creation": {
+          "ephemeral_5m_input_tokens": 1291,
+          "ephemeral_1h_input_tokens": 0
+        },
+        "type": "message",
+        "model": null
+      },
+      {
+        "input_tokens": 2,
+        "output_tokens": 143,
+        "cache_read_input_tokens": 25349,
+        "cache_creation_input_tokens": 211,
+        "cache_creation": {
+          "ephemeral_5m_input_tokens": 211,
+          "ephemeral_1h_input_tokens": 0
+        },
+        "type": "message",
+        "model": null
+      },
+      {
+        "input_tokens": 2,
+        "output_tokens": 156,
+        "cache_read_input_tokens": 25560,
+        "cache_creation_input_tokens": 585,
+        "cache_creation": {
+          "ephemeral_5m_input_tokens": 585,
+          "ephemeral_1h_input_tokens": 0
+        },
+        "type": "message",
+        "model": null
+      },
+      {
+        "input_tokens": 2,
+        "output_tokens": 157,
+        "cache_read_input_tokens": 26145,
+        "cache_creation_input_tokens": 193,
+        "cache_creation": {
+          "ephemeral_5m_input_tokens": 193,
+          "ephemeral_1h_input_tokens": 0
+        },
+        "type": "message",
+        "model": null
+      },
+      {
+        "input_tokens": 2,
+        "output_tokens": 174,
+        "cache_read_input_tokens": 26338,
+        "cache_creation_input_tokens": 2937,
+        "cache_creation": {
+          "ephemeral_5m_input_tokens": 2937,
+          "ephemeral_1h_input_tokens": 0
+        },
+        "type": "message",
+        "model": null
+      },
+      {
+        "input_tokens": 2,
+        "output_tokens": 157,
+        "cache_read_input_tokens": 29275,
+        "cache_creation_input_tokens": 2138,
+        "cache_creation": {
+          "ephemeral_5m_input_tokens": 2138,
+          "ephemeral_1h_input_tokens": 0
+        },
+        "type": "message",
+        "model": null
+      },
+      {
+        "input_tokens": 2,
+        "output_tokens": 98,
+        "cache_read_input_tokens": 31413,
+        "cache_creation_input_tokens": 3355,
+        "cache_creation": {
+          "ephemeral_5m_input_tokens": 3355,
+          "ephemeral_1h_input_tokens": 0
+        },
+        "type": "message",
+        "model": null
+      },
+      {
+        "input_tokens": 2,
+        "output_tokens": 283,
+        "cache_read_input_tokens": 34768,
+        "cache_creation_input_tokens": 2166,
+        "cache_creation": {
+          "ephemeral_5m_input_tokens": 2166,
+          "ephemeral_1h_input_tokens": 0
+        },
+        "type": "message",
+        "model": null
+      },
+      {
+        "input_tokens": 2,
+        "output_tokens": 219,
+        "cache_read_input_tokens": 36934,
+        "cache_creation_input_tokens": 320,
+        "cache_creation": {
+          "ephemeral_5m_input_tokens": 320,
+          "ephemeral_1h_input_tokens": 0
+        },
+        "type": "message",
+        "model": null
+      },
+      {
+        "input_tokens": 2,
+        "output_tokens": 616,
+        "cache_read_input_tokens": 37254,
+        "cache_creation_input_tokens": 2218,
+        "cache_creation": {
+          "ephemeral_5m_input_tokens": 2218,
+          "ephemeral_1h_input_tokens": 0
+        },
+        "type": "message",
+        "model": null
+      },
+      {
+        "input_tokens": 2,
+        "output_tokens": 1448,
+        "cache_read_input_tokens": 39472,
+        "cache_creation_input_tokens": 633,
+        "cache_creation": {
+          "ephemeral_5m_input_tokens": 633,
+          "ephemeral_1h_input_tokens": 0
+        },
+        "type": "message",
+        "model": null
+      },
+      {
+        "input_tokens": 2,
+        "output_tokens": 11161,
+        "cache_read_input_tokens": 40105,
+        "cache_creation_input_tokens": 1489,
+        "cache_creation": {
+          "ephemeral_5m_input_tokens": 1489,
+          "ephemeral_1h_input_tokens": 0
+        },
+        "type": "message",
+        "model": null
+      }
+    ],
+    "output_tokens_details": {
+      "thinking_tokens": 4228
+    }
+  },
+  "model": "claude-opus-5-5"
+}
