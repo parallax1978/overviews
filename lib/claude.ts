@@ -38,7 +38,14 @@ let client: Anthropic | null = null;
 
 /** Anthropic client, created on first use so importing this module never needs the API key. */
 function getClient(): Anthropic {
-  if (!client) client = new Anthropic({ apiKey: serverEnv.anthropicApiKey });
+  if (!client) {
+    const workspaceId = serverEnv.anthropicWorkspaceId;
+    client = new Anthropic({
+      apiKey: serverEnv.anthropicApiKey,
+      // User-scoped keys must name the workspace to bill; workspace keys ignore this.
+      ...(workspaceId ? { defaultHeaders: { "anthropic-workspace-id": workspaceId } } : {}),
+    });
+  }
   return client;
 }
 

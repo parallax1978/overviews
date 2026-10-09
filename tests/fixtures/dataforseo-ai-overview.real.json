@@ -1,0 +1,817 @@
+{
+  "version": "0.1.20260917",
+  "status_code": 20000,
+  "status_message": "Ok.",
+  "time": "3.6864 sec.",
+  "cost": 0.002,
+  "tasks_count": 1,
+  "tasks_error": 0,
+  "tasks": [
+    {
+      "id": "10090701-8814-0139-0000-4e332a854d00",
+      "status_code": 20000,
+      "status_message": "Ok.",
+      "time": "3.5139 sec.",
+      "cost": 0.002,
+      "result_count": 1,
+      "path": [
+        "v3",
+        "serp",
+        "google",
+        "organic",
+        "live",
+        "advanced"
+      ],
+      "data": {
+        "api": "serp",
+        "function": "live",
+        "se": "google",
+        "se_type": "organic",
+        "keyword": "best form builder",
+        "location_code": 2840,
+        "language_code": "en",
+        "device": "desktop",
+        "os": "windows",
+        "depth": 10,
+        "load_async_ai_overview": true
+      },
+      "result": [
+        {
+          "keyword": "best form builder",
+          "type": "organic",
+          "se_domain": "google.com",
+          "location_code": 2840,
+          "language_code": "en",
+          "check_url": "https://www.google.com/search?q=best%20form%20builder&hl=en&gl=US&ie=UTF-8&uule=w+CAIQIFISCQs2MuSEtepUEUK33kOSuTsc",
+          "datetime": "2026-10-09 07:01:28 +00:00",
+          "spell": null,
+          "refinement_chips": null,
+          "item_types": [
+            "ai_overview",
+            "organic",
+            "people_also_ask",
+            "video",
+            "related_searches"
+          ],
+          "se_results_count": 93,
+          "pages_count": 1,
+          "items_count": 12,
+          "items": [
+            {
+              "type": "ai_overview",
+              "rank_group": 1,
+              "rank_absolute": 1,
+              "page": 1,
+              "position": "left",
+              "xpath": "/html[1]/body[1]/div[3]/div[1]/div[13]/div[1]/div[2]/div[1]/div[1]/div[1]/div[1]/div[1]/div[1]",
+              "asynchronous_ai_overview": false,
+              "markdown": "The [Jotform](https://www.jotform.com/) online form builder is the best overall tool because it offers advanced features, powerful workflows, and extensive design customization.[[1]](https://www.g2.com/categories/online-form-builder)[[2]](https://ventureharbour.com/best-form-builders/)\n\n### Top Form Builders by Use Case\n\n- **Best Overall & Feature-Rich:** Jotform provides 10,000+ templates, payment collection, conditional logic, and integrated workflows.\n- **Best Interactive & Conversational:** [Typeform](https://www.typeform.com/forms) displays one question at a time for high-converting marketing, sales, and survey forms.\n- **Best Free Tier with Unlimited Responses:** [forms.app](https://forms.app/) includes unlimited responses and team seats on its free plan alongside AI form generation.\n- **Best Notion-Style & Clean UI:** [Tally](https://tally.so/) uses a block-based editor and offers unlimited forms and submissions for free.\n- **Best for Google Ecosystem:** Google Forms is a completely free, simple tool for quick quizzes and feedback.\n- **Best for Microsoft Ecosystem:** Microsoft Forms is built into Microsoft 365 for basic, clean surveys and quizzes.[[1]](https://www.reddit.com/r/nocode/comments/10l3gcr/what_is_your_favourite_nocode_form_builder/)[[2]](https://topformbuilders.com/)[[3]](https://ventureharbour.com/best-form-builders/)[[4]](https://www.youtube.com/watch?v=LjruiSzkXik&t=28)[[5]](https://www.typeform.com/forms)[[6]](https://freeformbuilders.com/)[[7]](https://www.youtube.com/watch?v=5LzJW1QQL0U)\n\nWatch this video to compare the top form builders in 2026:\n\n![](https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQH5wGsOBveT-b9eblZAFJVmsHzICdkv8_3mSzhNDqLBMDJsHPu)\n8:38\n[](https://www.youtube.com/watch?v=5LzJW1QQL0U) 5 Best Form Builders in 2026: Top Tools Compared 20 days ago![](https://encrypted-tbn2.gstatic.com/faviconV2?url=https://www.youtube.com&amp;client=AIM&amp;size=16&amp;type=FAVICON&amp;fallback_opts=TYPE,SIZE,URL)\nYouTube · Brennan Valeski\n\nIf you'd like to narrow down your choice, tell me:\n\n- What is your **budget** (free vs. paid)?\n- What is the **main purpose** of the form (payments, surveys, lead generation)?\n- Do you need **specific integrations** (like Notion, Salesforce, or Google Sheets)?",
+              "items": [
+                {
+                  "type": "ai_overview_element",
+                  "position": "left",
+                  "title": null,
+                  "text": "The Jotform online form builder is the best overall tool because it offers advanced features, powerful workflows, and extensive design customization.",
+                  "markdown": "The [Jotform](https://www.jotform.com/) online form builder is the best overall tool because it offers advanced features, powerful workflows, and extensive design customization.[[1]](https://www.g2.com/categories/online-form-builder)[[2]](https://ventureharbour.com/best-form-builders/)",
+                  "links": [
+                    {
+                      "type": "link_element",
+                      "title": "Jotform",
+                      "description": null,
+                      "url": "https://www.jotform.com/",
+                      "domain": "www.jotform.com"
+                    }
+                  ],
+                  "images": null,
+                  "references": [
+                    {
+                      "type": "ai_overview_reference",
+                      "position": "left",
+                      "source": "G2",
+                      "domain": "www.g2.com",
+                      "url": "https://www.g2.com/categories/online-form-builder",
+                      "title": "Best Online Form Builder Software: User Reviews from October 2026 - G2",
+                      "text": "Top 5 FAQs from software buyers: What platform supports payment collection through forms? What tool provides real-time analytics f..."
+                    },
+                    {
+                      "type": "ai_overview_reference",
+                      "position": "left",
+                      "source": "Venture Harbour",
+                      "domain": "ventureharbour.com",
+                      "url": "https://ventureharbour.com/best-form-builders/",
+                      "title": "25 Best Form Builders for 2026",
+                      "text": "Which forms builders are we looking at? And to do this, we'll be looking at the following 25 form builders: Typeform: The affordab..."
+                    }
+                  ]
+                },
+                {
+                  "type": "ai_overview_element",
+                  "position": "left",
+                  "title": "Top Form Builders by Use Case",
+                  "text": "Best Overall & Feature-Rich: Jotform provides 10,000+ templates, payment collection, conditional logic, and integrated workflows. Best Interactive & Conversational: Typeform displays one question at a time for high-converting marketing, sales, and survey forms. Best Free Tier with Unlimited Responses: forms.app includes unlimited responses and team seats on its free plan alongside AI form generation. Best Notion-Style & Clean UI: Tally uses a block-based editor and offers unlimited forms and submissions for free. Best for Google Ecosystem: Google Forms is a completely free, simple tool for quick quizzes and feedback. Best for Microsoft Ecosystem: Microsoft Forms is built into Microsoft 365 for basic, clean surveys and quizzes.",
+                  "markdown": "- **Best Overall & Feature-Rich:** Jotform provides 10,000+ templates, payment collection, conditional logic, and integrated workflows.\n- **Best Interactive & Conversational:** [Typeform](https://www.typeform.com/forms) displays one question at a time for high-converting marketing, sales, and survey forms.\n- **Best Free Tier with Unlimited Responses:** [forms.app](https://forms.app/) includes unlimited responses and team seats on its free plan alongside AI form generation.\n- **Best Notion-Style & Clean UI:** [Tally](https://tally.so/) uses a block-based editor and offers unlimited forms and submissions for free.\n- **Best for Google Ecosystem:** Google Forms is a completely free, simple tool for quick quizzes and feedback.\n- **Best for Microsoft Ecosystem:** Microsoft Forms is built into Microsoft 365 for basic, clean surveys and quizzes.[[1]](https://www.reddit.com/r/nocode/comments/10l3gcr/what_is_your_favourite_nocode_form_builder/)[[2]](https://topformbuilders.com/)[[3]](https://ventureharbour.com/best-form-builders/)[[4]](https://www.youtube.com/watch?v=LjruiSzkXik&t=28)[[5]](https://www.typeform.com/forms)[[6]](https://freeformbuilders.com/)[[7]](https://www.youtube.com/watch?v=5LzJW1QQL0U)",
+                  "links": [
+                    {
+                      "type": "link_element",
+                      "title": "Typeform",
+                      "description": null,
+                      "url": "https://www.typeform.com/forms",
+                      "domain": "www.typeform.com"
+                    },
+                    {
+                      "type": "link_element",
+                      "title": "forms.app",
+                      "description": null,
+                      "url": "https://forms.app/",
+                      "domain": "forms.app"
+                    },
+                    {
+                      "type": "link_element",
+                      "title": "Tally",
+                      "description": null,
+                      "url": "https://tally.so/",
+                      "domain": "tally.so"
+                    }
+                  ],
+                  "images": null,
+                  "references": [
+                    {
+                      "type": "ai_overview_reference",
+                      "position": "left",
+                      "source": "Reddit",
+                      "domain": "www.reddit.com",
+                      "url": "https://www.reddit.com/r/nocode/comments/10l3gcr/what_is_your_favourite_nocode_form_builder/",
+                      "title": "What is your favourite no-code form builder? : r/nocode - Reddit",
+                      "text": "Tally Features: Tally is a popular no-code form builder with a generous free plan that includes unlimited forms and submissions, f..."
+                    },
+                    {
+                      "type": "ai_overview_reference",
+                      "position": "left",
+                      "source": "topformbuilders.com",
+                      "domain": "topformbuilders.com",
+                      "url": "https://topformbuilders.com/",
+                      "title": "Form Builders",
+                      "text": "Top Rated Builders * Featured Typeform Typeform is a beautiful, conversational form builder that creates engaging, one-question-at..."
+                    },
+                    {
+                      "type": "ai_overview_reference",
+                      "position": "left",
+                      "source": "Venture Harbour",
+                      "domain": "ventureharbour.com",
+                      "url": "https://ventureharbour.com/best-form-builders/",
+                      "title": "25 Best Form Builders for 2026",
+                      "text": "Which forms builders are we looking at? And to do this, we'll be looking at the following 25 form builders: Typeform: The affordab..."
+                    },
+                    {
+                      "type": "ai_overview_reference",
+                      "position": "left",
+                      "source": "YouTube",
+                      "domain": "www.youtube.com",
+                      "url": "https://www.youtube.com/watch?v=LjruiSzkXik&t=28",
+                      "title": "Google Forms vs Typeform - Which one is best for you?",
+                      "text": "Google Forms vs Typeform - Which one is best for you? and much more sub Subscribe to the channel if you want to leverage tech to h..."
+                    },
+                    {
+                      "type": "ai_overview_reference",
+                      "position": "left",
+                      "source": "Typeform",
+                      "domain": "www.typeform.com",
+                      "url": "https://www.typeform.com/forms",
+                      "title": "Online Form Builder : Create Free Forms | Typeform",
+                      "text": "* 95% customers collect more data with less effort. * 95% of Fortune 500 trust Typeform; 60% of Fortune 500 included in 150k+ cust..."
+                    },
+                    {
+                      "type": "ai_overview_reference",
+                      "position": "left",
+                      "source": "freeformbuilders.com",
+                      "domain": "freeformbuilders.com",
+                      "url": "https://freeformbuilders.com/",
+                      "title": "Free Form Builders",
+                      "text": "Each shows the builder itself and the pricing page, so you can see exactly what \"free\" looks like before you sign up. * 1 ★ Editor..."
+                    },
+                    {
+                      "type": "ai_overview_reference",
+                      "position": "left",
+                      "source": "YouTube",
+                      "domain": "www.youtube.com",
+                      "url": "https://www.youtube.com/watch?v=5LzJW1QQL0U",
+                      "title": "5 Best Form Builders in 2026: Top Tools Compared",
+                      "text": "and next moving on list we have is Microsoft forms now next Microsoft forms is if your organization already lives inside Microsoft..."
+                    }
+                  ]
+                },
+                {
+                  "type": "ai_overview_element",
+                  "position": "left",
+                  "title": null,
+                  "text": "Watch this video to compare the top form builders in 2026: 8:38 5 Best Form Builders in 2026: Top Tools Compared 20 days ago YouTube · Brennan Valeski",
+                  "markdown": "Watch this video to compare the top form builders in 2026:\n\n![](https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQH5wGsOBveT-b9eblZAFJVmsHzICdkv8_3mSzhNDqLBMDJsHPu)\n8:38\n[](https://www.youtube.com/watch?v=5LzJW1QQL0U) 5 Best Form Builders in 2026: Top Tools Compared 20 days ago![](https://encrypted-tbn2.gstatic.com/faviconV2?url=https://www.youtube.com&amp;client=AIM&amp;size=16&amp;type=FAVICON&amp;fallback_opts=TYPE,SIZE,URL)\nYouTube · Brennan Valeski",
+                  "links": null,
+                  "images": null,
+                  "references": null
+                },
+                {
+                  "type": "ai_overview_element",
+                  "position": "left",
+                  "title": null,
+                  "text": "If you'd like to narrow down your choice, tell me:What is your budget (free vs. paid)?\nWhat is the main purpose of the form (payments, surveys, lead generation)?\nDo you need specific integrations (like Notion, Salesforce, or Google Sheets)?",
+                  "markdown": "If you'd like to narrow down your choice, tell me:\n\n- What is your **budget** (free vs. paid)?\n- What is the **main purpose** of the form (payments, surveys, lead generation)?\n- Do you need **specific integrations** (like Notion, Salesforce, or Google Sheets)?",
+                  "links": null,
+                  "images": null,
+                  "references": null
+                }
+              ],
+              "references": [
+                {
+                  "type": "ai_overview_reference",
+                  "position": "right",
+                  "source": "Reddit",
+                  "domain": "www.reddit.com",
+                  "url": "https://www.reddit.com/r/nocode/comments/10l3gcr/what_is_your_favourite_nocode_form_builder/",
+                  "title": "What is your favourite no-code form builder? : r/nocode - Reddit",
+                  "text": "Tally Features: Tally is a popular no-code form builder with a generous free plan that includes unlimited forms and submissions, f..."
+                },
+                {
+                  "type": "ai_overview_reference",
+                  "position": "right",
+                  "source": "Typeform",
+                  "domain": "www.typeform.com",
+                  "url": "https://www.typeform.com/forms",
+                  "title": "Online Form Builder : Create Free Forms | Typeform",
+                  "text": "* 95% customers collect more data with less effort. * 95% of Fortune 500 trust Typeform; 60% of Fortune 500 included in 150k+ cust..."
+                },
+                {
+                  "type": "ai_overview_reference",
+                  "position": "right",
+                  "source": "G2",
+                  "domain": "www.g2.com",
+                  "url": "https://www.g2.com/categories/online-form-builder",
+                  "title": "Best Online Form Builder Software: User Reviews from October 2026 - G2",
+                  "text": "Top 5 FAQs from software buyers: What platform supports payment collection through forms? What tool provides real-time analytics f..."
+                },
+                {
+                  "type": "ai_overview_reference",
+                  "position": "right",
+                  "source": "YouTube",
+                  "domain": "www.youtube.com",
+                  "url": "https://www.youtube.com/watch?v=5LzJW1QQL0U",
+                  "title": "5 Best Form Builders in 2026: Top Tools Compared",
+                  "text": "and next moving on list we have is Microsoft forms now next Microsoft forms is if your organization already lives inside Microsoft..."
+                },
+                {
+                  "type": "ai_overview_reference",
+                  "position": "right",
+                  "source": "YouTube",
+                  "domain": "www.youtube.com",
+                  "url": "https://www.youtube.com/watch?v=LjruiSzkXik&t=28",
+                  "title": "Google Forms vs Typeform - Which one is best for you?",
+                  "text": "Google Forms vs Typeform - Which one is best for you? and much more sub Subscribe to the channel if you want to leverage tech to h..."
+                },
+                {
+                  "type": "ai_overview_reference",
+                  "position": "right",
+                  "source": "Venture Harbour",
+                  "domain": "ventureharbour.com",
+                  "url": "https://ventureharbour.com/best-form-builders/",
+                  "title": "25 Best Form Builders for 2026",
+                  "text": "Which forms builders are we looking at? And to do this, we'll be looking at the following 25 form builders: Typeform: The affordab..."
+                },
+                {
+                  "type": "ai_overview_reference",
+                  "position": "right",
+                  "source": "freeformbuilders.com",
+                  "domain": "freeformbuilders.com",
+                  "url": "https://freeformbuilders.com/",
+                  "title": "Free Form Builders",
+                  "text": "Each shows the builder itself and the pricing page, so you can see exactly what \"free\" looks like before you sign up. * 1 ★ Editor..."
+                },
+                {
+                  "type": "ai_overview_reference",
+                  "position": "right",
+                  "source": "topformbuilders.com",
+                  "domain": "topformbuilders.com",
+                  "url": "https://topformbuilders.com/",
+                  "title": "Form Builders",
+                  "text": "Top Rated Builders * Featured Typeform Typeform is a beautiful, conversational form builder that creates engaging, one-question-at..."
+                },
+                {
+                  "type": "ai_overview_reference",
+                  "position": "right",
+                  "source": "www.youtube.com",
+                  "domain": "www.youtube.com",
+                  "url": "https://www.youtube.com/watch?v=7k_s2u73GmE",
+                  "title": "5 Best Online Form Builders in 2026 | Live Build Comparison",
+                  "text": "but there's something about the speed in using AI to get you started which is helpful for design. I think Type Form probably wins ..."
+                },
+                {
+                  "type": "ai_overview_reference",
+                  "position": "right",
+                  "source": "www.youtube.com",
+                  "domain": "www.youtube.com",
+                  "url": "https://www.youtube.com/watch?v=5LzJW1QQL0U",
+                  "title": "5 Best Form Builders in 2026: Top Tools Compared",
+                  "text": "and next moving on list we have is Microsoft forms now next Microsoft forms is if your organization already lives inside Microsoft..."
+                }
+              ],
+              "rectangle": null
+            },
+            {
+              "type": "organic",
+              "rank_group": 1,
+              "rank_absolute": 2,
+              "page": 1,
+              "position": "left",
+              "xpath": "/html[1]/body[1]/div[3]/div[1]/div[13]/div[2]/div[1]/div[2]/div[1]/div[1]/div[2]/div[1]/div[1]/div[1]",
+              "domain": "ventureharbour.com",
+              "title": "25+ Best Form Builders for Marketers & Businesses",
+              "url": "https://ventureharbour.com/best-form-builders/",
+              "cache_url": null,
+              "related_search_url": null,
+              "breadcrumb": "https://ventureharbour.com › No-Code Automation",
+              "website_name": "Venture Harbour",
+              "is_image": false,
+              "is_video": false,
+              "is_featured_snippet": false,
+              "is_malicious": false,
+              "is_web_story": false,
+              "checks": null,
+              "description": "Apr 9, 2026 — Typeform: The affordable choice for surveys & questionnaires. Feathery: Best for onboarding, login & payment forms SamCart: Best for product / ...",
+              "pre_snippet": "04/09/2026 00:00:00",
+              "extended_snippet": null,
+              "images": null,
+              "amp_version": false,
+              "rating": null,
+              "price": null,
+              "highlighted": [
+                "Typeform: The affordable choice for surveys & questionnaires"
+              ],
+              "links": [
+                {
+                  "type": "link_element",
+                  "title": "What makes a great form...",
+                  "description": null,
+                  "url": "https://ventureharbour.com/best-form-builders/#what-makes-a-great-form-builder",
+                  "domain": "ventureharbour.com"
+                },
+                {
+                  "type": "link_element",
+                  "title": "14HubSpot's Online Form...",
+                  "description": null,
+                  "url": "https://ventureharbour.com/best-form-builders/#hubspots-online-form-builder-ideal-if-youre-using-hubspots-free-crm",
+                  "domain": "ventureharbour.com"
+                },
+                {
+                  "type": "link_element",
+                  "title": "16Forminator (The best...",
+                  "description": null,
+                  "url": "https://ventureharbour.com/best-form-builders/#forminator-the-best-contact-payment-and-quiz-form-plugin-for-wordpress",
+                  "domain": "ventureharbour.com"
+                }
+              ],
+              "faq": null,
+              "extended_people_also_search": null,
+              "about_this_result": null,
+              "related_result": null,
+              "timestamp": "2026-04-09 00:00:00 +00:00",
+              "rectangle": null
+            },
+            {
+              "type": "organic",
+              "rank_group": 2,
+              "rank_absolute": 3,
+              "page": 1,
+              "position": "left",
+              "xpath": "/html[1]/body[1]/div[3]/div[1]/div[13]/div[2]/div[1]/div[2]/div[1]/div[1]/div[2]/div[3]/div[1]/div[1]",
+              "domain": "formbuilder.com",
+              "title": "6 Best Form Builders for WordPress 2026 Comparison",
+              "url": "https://formbuilder.com/blog/6-best-form-builders-for-wordpress-2024-comparison/",
+              "cache_url": null,
+              "related_search_url": null,
+              "breadcrumb": "https://formbuilder.com › blog › 6-best-form-builders-f...",
+              "website_name": "FormBuilder",
+              "is_image": false,
+              "is_video": false,
+              "is_featured_snippet": false,
+              "is_malicious": false,
+              "is_web_story": false,
+              "checks": null,
+              "description": "Sep 4, 2026 — 6 Best Form Builders for WordPress 2026 Comparison · 1. Best WordPress form builder with AI features: FormBuilder · 2. WPForms · 3. Formidable ... Read more",
+              "pre_snippet": "09/04/2026 00:00:00",
+              "extended_snippet": null,
+              "images": null,
+              "amp_version": false,
+              "rating": null,
+              "price": null,
+              "highlighted": [
+                "1. Best WordPress form builder with AI features: FormBuilder"
+              ],
+              "links": [
+                {
+                  "type": "link_element",
+                  "title": "Read more",
+                  "description": null,
+                  "url": "https://formbuilder.com/blog/6-best-form-builders-for-wordpress-2024-comparison/#:~:text=6%20Best%20Form%20Builders%20for,WordPress%202026%20Comparison&text=1.%20Best%20WordPress%20form%20builder,with%20AI%20features%3A%20FormBuilder&text=2.%20WPForms&text=3.%20Formidable%20Forms",
+                  "domain": "formbuilder.com"
+                }
+              ],
+              "faq": null,
+              "extended_people_also_search": null,
+              "about_this_result": null,
+              "related_result": null,
+              "timestamp": "2026-09-04 00:00:00 +00:00",
+              "rectangle": null
+            },
+            {
+              "type": "organic",
+              "rank_group": 3,
+              "rank_absolute": 4,
+              "page": 1,
+              "position": "left",
+              "xpath": "/html[1]/body[1]/div[3]/div[1]/div[13]/div[2]/div[1]/div[2]/div[1]/div[1]/div[2]/div[5]/div[1]/div[1]",
+              "domain": "heyflow.com",
+              "title": "The 5 best free form builders for 2024",
+              "url": "https://heyflow.com/blog/best-free-form-builders-2024/",
+              "cache_url": null,
+              "related_search_url": null,
+              "breadcrumb": "https://heyflow.com › blog › best-free-form-builders-2...",
+              "website_name": "Heyflow",
+              "is_image": false,
+              "is_video": false,
+              "is_featured_snippet": false,
+              "is_malicious": false,
+              "is_web_story": false,
+              "checks": null,
+              "description": "Apr 18, 2024 — 5 best free form builders · 1. Heyflow · 2. Google Forms · 3. Tally · 4. 123FormBuilder · 5. Formester. Screenshot showing the hero of ... Read more",
+              "pre_snippet": "04/18/2024 00:00:00",
+              "extended_snippet": "8.5/10(25)  · €39.00",
+              "images": null,
+              "amp_version": false,
+              "rating": {
+                "rating_type": "Max5",
+                "value": 4,
+                "votes_count": 25,
+                "rating_max": 5
+              },
+              "price": {
+                "current": 39,
+                "regular": null,
+                "max_value": null,
+                "currency": "EUR",
+                "is_price_range": false,
+                "displayed_price": "€39.00"
+              },
+              "highlighted": [
+                "1. Heyflow"
+              ],
+              "links": [
+                {
+                  "type": "link_element",
+                  "title": "Read more",
+                  "description": null,
+                  "url": "https://heyflow.com/blog/best-free-form-builders-2024/#:~:text=5%20best%20free%20form%20builders&text=1.%20Heyflow&text=2.%20Google%20Forms&text=3.%20Tally&text=4.%20123FormBuilder&text=5.%20Formester",
+                  "domain": "heyflow.com"
+                }
+              ],
+              "faq": null,
+              "extended_people_also_search": null,
+              "about_this_result": null,
+              "related_result": null,
+              "timestamp": "2024-04-18 00:00:00 +00:00",
+              "rectangle": null
+            },
+            {
+              "type": "organic",
+              "rank_group": 4,
+              "rank_absolute": 5,
+              "page": 1,
+              "position": "left",
+              "xpath": "/html[1]/body[1]/div[3]/div[1]/div[13]/div[2]/div[1]/div[2]/div[1]/div[1]/div[2]/div[7]/div[1]/div[1]",
+              "domain": "www.quora.com",
+              "title": "What is the best form builder software? Is there a better one ...",
+              "url": "https://www.quora.com/What-is-the-best-form-builder-software-Is-there-a-better-one-than-jotform",
+              "cache_url": null,
+              "related_search_url": null,
+              "breadcrumb": "40+ answers  ·  15 years ago",
+              "website_name": "Quora",
+              "is_image": false,
+              "is_video": false,
+              "is_featured_snippet": false,
+              "is_malicious": false,
+              "is_web_story": false,
+              "checks": null,
+              "description": "What is the best form builder software? Is there a better one than jotform?",
+              "pre_snippet": null,
+              "extended_snippet": null,
+              "images": null,
+              "amp_version": false,
+              "rating": null,
+              "price": null,
+              "highlighted": null,
+              "links": [
+                {
+                  "type": "link_element",
+                  "title": "47 answers",
+                  "description": null,
+                  "url": "https://www.quora.com/What-is-the-best-form-builder-software-Is-there-a-better-one-than-jotform?top_ans=92086959",
+                  "domain": "www.quora.com"
+                }
+              ],
+              "faq": null,
+              "extended_people_also_search": null,
+              "about_this_result": null,
+              "related_result": null,
+              "timestamp": null,
+              "rectangle": null
+            },
+            {
+              "type": "organic",
+              "rank_group": 5,
+              "rank_absolute": 6,
+              "page": 1,
+              "position": "left",
+              "xpath": "/html[1]/body[1]/div[3]/div[1]/div[13]/div[2]/div[1]/div[2]/div[1]/div[1]/div[2]/div[9]/div[1]/div[1]",
+              "domain": "freeformbuilders.com",
+              "title": "Best Free Form Builders (2026): 20 Tools Tested & Compared",
+              "url": "https://freeformbuilders.com/",
+              "cache_url": null,
+              "related_search_url": null,
+              "breadcrumb": "https://freeformbuilders.com",
+              "website_name": "freeformbuilders.com",
+              "is_image": false,
+              "is_video": false,
+              "is_featured_snippet": false,
+              "is_malicious": false,
+              "is_web_story": false,
+              "checks": null,
+              "description": "We tested 20 of the best free form builders for 2026 — forms.app, Tally, Jotform, Typeform, Google Forms and more — ranked by free response limits, ...",
+              "pre_snippet": null,
+              "extended_snippet": null,
+              "images": null,
+              "amp_version": false,
+              "rating": null,
+              "price": null,
+              "highlighted": [
+                "forms.app, Tally, Jotform, Typeform, Google Forms"
+              ],
+              "links": null,
+              "faq": null,
+              "extended_people_also_search": null,
+              "about_this_result": null,
+              "related_result": null,
+              "timestamp": null,
+              "rectangle": null
+            },
+            {
+              "type": "people_also_ask",
+              "rank_group": 1,
+              "rank_absolute": 7,
+              "page": 1,
+              "position": "left",
+              "xpath": "/html[1]/body[1]/div[3]/div[1]/div[13]/div[2]/div[1]/div[2]/div[1]/div[1]/div[2]/div[11]/div[1]/div[1]/div[1]",
+              "items": [
+                {
+                  "type": "people_also_ask_element",
+                  "title": "Which is the best forms app?",
+                  "seed_question": null,
+                  "xpath": "/html[1]/body[1]/div[3]/div[1]/div[13]/div[2]/div[1]/div[2]/div[1]/div[1]/div[2]/div[11]/div[1]/div[1]/div[1]/div[1]/div[2]/div[1]",
+                  "expanded_element": [
+                    {
+                      "type": "people_also_ask_ai_overview_expanded_element",
+                      "items": null,
+                      "references": null,
+                      "asynchronous_ai_overview": true
+                    }
+                  ]
+                },
+                {
+                  "type": "people_also_ask_element",
+                  "title": "Is Typeform or Google form better?",
+                  "seed_question": null,
+                  "xpath": "/html[1]/body[1]/div[3]/div[1]/div[13]/div[2]/div[1]/div[2]/div[1]/div[1]/div[2]/div[11]/div[1]/div[1]/div[1]/div[1]/div[2]/div[2]",
+                  "expanded_element": [
+                    {
+                      "type": "people_also_ask_ai_overview_expanded_element",
+                      "items": null,
+                      "references": null,
+                      "asynchronous_ai_overview": true
+                    }
+                  ]
+                },
+                {
+                  "type": "people_also_ask_element",
+                  "title": "Is Google Forms 100% free?",
+                  "seed_question": null,
+                  "xpath": "/html[1]/body[1]/div[3]/div[1]/div[13]/div[2]/div[1]/div[2]/div[1]/div[1]/div[2]/div[11]/div[1]/div[1]/div[1]/div[1]/div[2]/div[3]",
+                  "expanded_element": [
+                    {
+                      "type": "people_also_ask_ai_overview_expanded_element",
+                      "items": null,
+                      "references": null,
+                      "asynchronous_ai_overview": true
+                    }
+                  ]
+                },
+                {
+                  "type": "people_also_ask_element",
+                  "title": "Are tally forms really free?",
+                  "seed_question": null,
+                  "xpath": "/html[1]/body[1]/div[3]/div[1]/div[13]/div[2]/div[1]/div[2]/div[1]/div[1]/div[2]/div[11]/div[1]/div[1]/div[1]/div[1]/div[2]/div[4]",
+                  "expanded_element": [
+                    {
+                      "type": "people_also_ask_ai_overview_expanded_element",
+                      "items": null,
+                      "references": null,
+                      "asynchronous_ai_overview": true
+                    }
+                  ]
+                }
+              ],
+              "rectangle": null
+            },
+            {
+              "type": "video",
+              "rank_group": 1,
+              "rank_absolute": 8,
+              "page": 1,
+              "position": "left",
+              "xpath": "/html[1]/body[1]/div[3]/div[1]/div[13]/div[2]/div[1]/div[2]/div[1]/div[1]/div[2]/div[13]/div[1]",
+              "items": [
+                {
+                  "type": "video_element",
+                  "source": "YouTube · Jotform",
+                  "title": "5 Best Online Form Builders in 2026 | Live Build Comparison",
+                  "timestamp": "2026-03-05 00:00:00 +00:00",
+                  "url": "https://www.youtube.com/watch?v=7k_s2u73GmE"
+                },
+                {
+                  "type": "video_element",
+                  "source": "YouTube · Click Guide",
+                  "title": "Best Free Online Form Builders (2026): Our Top 5 Picks!",
+                  "timestamp": "2025-09-18 00:00:00 +00:00",
+                  "url": "https://www.youtube.com/watch?v=_jKQFhoShBs"
+                },
+                {
+                  "type": "video_element",
+                  "source": "YouTube · Business Solution",
+                  "title": "More POWERFUL Google Forms Alternatives (No Code)",
+                  "timestamp": "2024-05-06 00:00:00 +00:00",
+                  "url": "https://www.youtube.com/watch?v=D7Wr49IKXNo"
+                }
+              ],
+              "rectangle": null
+            },
+            {
+              "type": "organic",
+              "rank_group": 6,
+              "rank_absolute": 9,
+              "page": 1,
+              "position": "left",
+              "xpath": "/html[1]/body[1]/div[3]/div[1]/div[13]/div[2]/div[1]/div[2]/div[1]/div[1]/div[2]/div[15]/div[1]/div[1]",
+              "domain": "learn.g2.com",
+              "title": "10 Best Free Online Form Builders for Small Businesses in ...",
+              "url": "https://learn.g2.com/best-free-form-builder",
+              "cache_url": null,
+              "related_search_url": null,
+              "breadcrumb": "https://learn.g2.com › best-free-form-builder",
+              "website_name": "G2 Learning Hub",
+              "is_image": false,
+              "is_video": false,
+              "is_featured_snippet": false,
+              "is_malicious": false,
+              "is_web_story": false,
+              "checks": null,
+              "description": "Jun 29, 2026 — Jotform, Forms.app, ClickUp, and Wrike all offer genuine free plans, while SurveyMonkey and Typeform lean more toward limited free tiers that ... Read more",
+              "pre_snippet": "06/29/2026 00:00:00",
+              "extended_snippet": null,
+              "images": null,
+              "amp_version": false,
+              "rating": null,
+              "price": null,
+              "highlighted": [
+                "Jotform, Forms.app, ClickUp, and Wrike"
+              ],
+              "links": [
+                {
+                  "type": "link_element",
+                  "title": "Read more",
+                  "description": null,
+                  "url": "https://learn.g2.com/best-free-form-builder#:~:text=Jotform%2C%20Forms.app%2C%20ClickUp%2C%20and%20Wrike,that%20work%20mainly%20for%20testing.",
+                  "domain": "learn.g2.com"
+                }
+              ],
+              "faq": null,
+              "extended_people_also_search": null,
+              "about_this_result": null,
+              "related_result": null,
+              "timestamp": "2026-06-29 00:00:00 +00:00",
+              "rectangle": null
+            },
+            {
+              "type": "organic",
+              "rank_group": 7,
+              "rank_absolute": 10,
+              "page": 1,
+              "position": "left",
+              "xpath": "/html[1]/body[1]/div[3]/div[1]/div[13]/div[2]/div[1]/div[2]/div[1]/div[1]/div[2]/div[17]/div[1]/div[1]",
+              "domain": "topformbuilders.com",
+              "title": "Best Form Builders Reviewed & Compared 2026 ...",
+              "url": "https://topformbuilders.com/",
+              "cache_url": null,
+              "related_search_url": null,
+              "breadcrumb": "https://topformbuilders.com",
+              "website_name": "topformbuilders.com",
+              "is_image": false,
+              "is_video": false,
+              "is_featured_snippet": false,
+              "is_malicious": false,
+              "is_web_story": false,
+              "checks": null,
+              "description": "Tally is a free, Notion-like form builder that lets you create beautiful forms with a simple block-based editor. Unlimited forms and responses on the free plan. Read more",
+              "pre_snippet": null,
+              "extended_snippet": null,
+              "images": null,
+              "amp_version": false,
+              "rating": null,
+              "price": null,
+              "highlighted": [
+                "Tally"
+              ],
+              "links": [
+                {
+                  "type": "link_element",
+                  "title": "Read more",
+                  "description": null,
+                  "url": "https://topformbuilders.com/#:~:text=Tally%20is%20a%20free%2C%20Notion-like,responses%20on%20the%20free%20plan.",
+                  "domain": "topformbuilders.com"
+                }
+              ],
+              "faq": null,
+              "extended_people_also_search": null,
+              "about_this_result": null,
+              "related_result": null,
+              "timestamp": null,
+              "rectangle": null
+            },
+            {
+              "type": "organic",
+              "rank_group": 8,
+              "rank_absolute": 11,
+              "page": 1,
+              "position": "left",
+              "xpath": "/html[1]/body[1]/div[3]/div[1]/div[13]/div[2]/div[1]/div[2]/div[1]/div[1]/div[2]/div[19]/div[1]/div[1]",
+              "domain": "makeforms.io",
+              "title": "Custom Form Builders That Let You Design Without ...",
+              "url": "https://makeforms.io/blog/custom-form-builders-that-let-you-design-without-limitations",
+              "cache_url": null,
+              "related_search_url": null,
+              "breadcrumb": "https://makeforms.io › Home › Blog",
+              "website_name": "MakeForms",
+              "is_image": false,
+              "is_video": false,
+              "is_featured_snippet": false,
+              "is_malicious": false,
+              "is_web_story": false,
+              "checks": null,
+              "description": "MakeForms is built for you. MakeForms stands out as a true custom form builder with full control over branding, layout, fonts, images, videos, and website- ...",
+              "pre_snippet": null,
+              "extended_snippet": null,
+              "images": null,
+              "amp_version": false,
+              "rating": null,
+              "price": null,
+              "highlighted": [
+                "MakeForms"
+              ],
+              "links": null,
+              "faq": null,
+              "extended_people_also_search": null,
+              "about_this_result": null,
+              "related_result": null,
+              "timestamp": null,
+              "rectangle": null
+            },
+            {
+              "type": "related_searches",
+              "rank_group": 1,
+              "rank_absolute": 12,
+              "page": 1,
+              "position": "left",
+              "xpath": "/html[1]/body[1]/div[3]/div[1]/div[13]/div[2]/div[2]/div[1]/div[3]/div[1]/div[1]/div[1]/div[1]/div[2]",
+              "items": [
+                "Best form builder free",
+                "Best form builder app",
+                "Best form builder online",
+                "Google Forms",
+                "Jotform",
+                "Typeform",
+                "Microsoft Forms",
+                "Formspree"
+              ],
+              "rectangle": null
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

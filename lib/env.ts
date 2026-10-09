@@ -36,6 +36,10 @@ export const serverEnv = {
   get anthropicApiKey() {
     return required("ANTHROPIC_API_KEY");
   },
+  /** Optional. Required by user-scoped Anthropic keys (sk-ant-usr-...), ignored by workspace keys. */
+  get anthropicWorkspaceId() {
+    return process.env.ANTHROPIC_WORKSPACE_ID || null;
+  },
   get cronSecret() {
     return required("CRON_SECRET");
   },
