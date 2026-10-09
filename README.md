@@ -105,8 +105,9 @@ node scripts/capture-now.mjs
    the Supabase integration from the Vercel marketplace it sets the three Supabase variables for
    you; add the rest by hand.
 3. Deploy. `vercel.json` registers the daily cron at `/api/cron/capture`; Vercel sends
-   `Authorization: Bearer <CRON_SECRET>` automatically. Both long routes declare
-   `maxDuration = 300`, which every current Vercel plan allows.
+   `Authorization: Bearer <CRON_SECRET>` automatically. The report and draft routes declare
+   `maxDuration = 800` (a report with eight page fetches can take five minutes), which needs the
+   Pro plan; on Hobby, lower both to 300 in `app/api/trackers/[id]/*/route.ts`.
 4. In Supabase, set the Site URL to your Vercel domain and add
    `https://<your-domain>/auth/confirm` to the auth Redirect URLs.
 
