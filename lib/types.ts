@@ -60,10 +60,19 @@ export interface SnapshotDiff {
   changed_sentences: string[];
 }
 
+/**
+ * Google generates a different AI Overview for every request (three identical
+ * back-to-back requests shared no cited source), so each daily capture takes
+ * this many samples. Reports count appearances across all samples.
+ */
+export const SAMPLES_PER_DAY = 3;
+
 export interface Snapshot {
   id: string;
   tracker_id: string;
   day_number: number;
+  /** 1-based index of this sample within its day (1..SAMPLES_PER_DAY). */
+  sample: number;
   captured_at: string;
   has_overview: boolean;
   overview_text: string | null;
@@ -72,14 +81,16 @@ export interface Snapshot {
   inline_links: OverviewInlineLink[];
   raw: unknown;
   content_hash: string | null;
+  /** Day-level change versus the previous day; stored on the day's first sample only, null on the others. */
   diff: SnapshotDiff | null;
   cost_usd: number;
 }
 
 /** Output of the first Claude call (patterns + citation teardown + page blueprint). */
 export interface AnalysisPatterns {
-  recurring_claims: { claim: string; days_present: number; example: string }[];
-  repeated_entities: { entity: string; days_present: number; role: string }[];
+  /** samples_present = distinct samples the claim appeared in; days_present = distinct days. */
+  recurring_claims: { claim: string; samples_present: number; days_present: number; example: string }[];
+  repeated_entities: { entity: string; samples_present: number; days_present: number; role: string }[];
   formats: {
     opening: string;
     structure: string;
@@ -90,6 +101,7 @@ export interface AnalysisPatterns {
   frequent_sources: {
     domain: string;
     url: string;
+    samples_cited: number;
     days_cited: number;
     cited_for: string;
   }[];
@@ -100,6 +112,7 @@ export interface AnalysisPatterns {
 export interface CitationResearchItem {
   url: string;
   domain: string;
+  samples_cited: number;
   days_cited: number;
   fetched: boolean;
   answers_how_fast: string;
@@ -141,6 +154,9 @@ export interface Analysis {
   citation_research: CitationResearchItem[] | null;
   blueprint: PageBlueprint | null;
   summary_md: string | null;
+  /** How many samples / distinct days the report was built from (null on rows from before sampling). */
+  samples_total: number | null;
+  days_total: number | null;
   usage: unknown;
   error: string | null;
 }
