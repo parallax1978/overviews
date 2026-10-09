@@ -1,0 +1,233 @@
+{
+  "version": "0.1.20250526",
+  "status_code": 20000,
+  "status_message": "Ok.",
+  "time": "4.1832 sec.",
+  "cost": 0.004,
+  "tasks_count": 1,
+  "tasks_error": 0,
+  "tasks": [
+    {
+      "id": "10081200-0000-0000-0000-000000000000",
+      "status_code": 20000,
+      "status_message": "Ok.",
+      "time": "4.0911 sec.",
+      "cost": 0.004,
+      "result_count": 1,
+      "path": ["v3", "serp", "google", "organic", "live", "advanced"],
+      "data": {
+        "api": "serp",
+        "function": "live",
+        "se": "google",
+        "se_type": "organic",
+        "keyword": "best form builder",
+        "location_code": 2840,
+        "language_code": "en",
+        "device": "desktop",
+        "os": "windows",
+        "depth": 10,
+        "load_async_ai_overview": true
+      },
+      "result": [
+        {
+          "keyword": "best form builder",
+          "type": "organic",
+          "se_domain": "google.com",
+          "location_code": 2840,
+          "language_code": "en",
+          "check_url": "https://www.google.com/search?q=best+form+builder&num=10&hl=en&gl=US&gws_rd=cr&ie=UTF-8&oe=UTF-8&uule=w+CAIQIFISCQs2MuSEtepUEUK33kOSuTsc",
+          "datetime": "2026-10-08 06:00:12 +00:00",
+          "spell": null,
+          "refinement_chips": null,
+          "item_types": ["ai_overview", "organic", "people_also_ask"],
+          "se_results_count": 123000000,
+          "items_count": 4,
+          "items": [
+            {
+              "type": "ai_overview",
+              "rank_group": 1,
+              "rank_absolute": 1,
+              "position": "left",
+              "xpath": "/html[1]/body[1]/div[3]/div[1]/div[13]/div[1]/div[2]/div[1]",
+              "asynchronous_ai_overview": true,
+              "markdown": "**Top picks**\n\nThe best form builders in 2026 are **Typeform** for design-led forms, **Jotform** for its template library, and **Google Forms** when free is the priority.",
+              "items": [
+                {
+                  "type": "ai_overview_element",
+                  "title": "Top picks",
+                  "text": "The best form builders in 2026 are Typeform for design-led forms, Jotform for its template library, and Google Forms when free is the priority.",
+                  "markdown": "The best form builders in 2026 are **Typeform** for design-led forms, **Jotform** for its template library, and **Google Forms** when free is the priority.",
+                  "links": [
+                    {
+                      "type": "link_element",
+                      "title": "Typeform",
+                      "url": "https://www.typeform.com/",
+                      "domain": "www.typeform.com"
+                    },
+                    {
+                      "type": "link_element",
+                      "title": "Jotform",
+                      "url": "https://www.jotform.com/",
+                      "domain": "www.jotform.com"
+                    }
+                  ],
+                  "images": null,
+                  "references": [
+                    {
+                      "type": "ai_overview_reference",
+                      "source": "Example Reviews",
+                      "domain": "www.example-reviews.com",
+                      "url": "https://www.example-reviews.com/best-form-builders",
+                      "title": "The 10 Best Form Builders in 2026 (Tested)",
+                      "text": "After testing 24 tools, Typeform, Jotform and Google Forms came out on top for most teams."
+                    },
+                    {
+                      "type": "ai_overview_reference",
+                      "source": "FormTools",
+                      "domain": "formtools.io",
+                      "url": "https://formtools.io/guide",
+                      "title": "Form Builder Buyer's Guide",
+                      "text": "Design-led teams tend to pick Typeform; template-heavy teams pick Jotform."
+                    }
+                  ]
+                },
+                {
+                  "type": "ai_overview_table_element",
+                  "title": null,
+                  "text": null,
+                  "markdown": "| Tool | Best for | Starting price |\n| --- | --- | --- |\n| Typeform | Design | $25/mo |\n| Jotform | Templates | Free |",
+                  "table": {
+                    "table_header": ["Tool", "Best for", "Starting price"],
+                    "table_content": [
+                      ["Typeform", "Design", "$25/mo"],
+                      ["Jotform", "Templates", "Free"]
+                    ]
+                  },
+                  "references": [
+                    {
+                      "type": "ai_overview_reference",
+                      "source": "Pricing Watch",
+                      "domain": "pricingwatch.com",
+                      "url": "https://pricingwatch.com/form-builders/",
+                      "title": "Form Builder Pricing Compared (October 2026)",
+                      "text": "Typeform starts at $25 per month; Jotform has a free plan with 5 forms."
+                    }
+                  ]
+                },
+                {
+                  "type": "ai_overview_expanded_element",
+                  "title": "How to choose",
+                  "text": "Pick based on how your team will build and share forms.",
+                  "components": [
+                    {
+                      "type": "ai_overview_element",
+                      "title": "Design and branding",
+                      "text": "If the form is customer-facing, favor tools with full visual control and custom domains.",
+                      "markdown": "If the form is customer-facing, favor tools with **full visual control** and custom domains.",
+                      "links": null,
+                      "images": null,
+                      "references": [
+                        {
+                          "type": "ai_overview_reference",
+                          "source": "FormTools Blog",
+                          "domain": "blog.formtools.io",
+                          "url": "https://blog.formtools.io/how-to-choose-a-form-builder",
+                          "title": "How to Choose a Form Builder",
+                          "text": "Customer-facing forms need visual control and a custom domain."
+                        }
+                      ]
+                    },
+                    {
+                      "type": "ai_overview_element",
+                      "title": "Integrations",
+                      "text": "Check that the builder connects to your CRM and payment provider before you commit.",
+                      "markdown": "Check that the builder connects to your **CRM** and **payment provider** before you commit.",
+                      "links": null,
+                      "images": null,
+                      "references": [
+                        {
+                          "type": "ai_overview_reference",
+                          "source": "Survey Central",
+                          "domain": "www.surveycentral.net",
+                          "url": "https://www.surveycentral.net/pricing-comparison",
+                          "title": "Form Builder Integrations and Pricing",
+                          "text": "Native CRM and Stripe integrations vary widely between builders."
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ],
+              "references": [
+                {
+                  "type": "ai_overview_reference",
+                  "source": "Example Reviews",
+                  "domain": "www.example-reviews.com",
+                  "url": "https://www.example-reviews.com/best-form-builders/?utm_source=google&utm_medium=ai_overview",
+                  "title": "Best Form Builders (duplicate entry, top level)",
+                  "text": "Duplicate of the first element reference with a trailing slash and utm params."
+                },
+                {
+                  "type": "ai_overview_reference",
+                  "source": "Form Builder FAQ",
+                  "domain": "www.formbuilderfaq.com",
+                  "url": "https://www.formbuilderfaq.com/faq",
+                  "title": "Form Builder FAQ",
+                  "text": "Answers to common questions about choosing a form builder."
+                }
+              ]
+            },
+            {
+              "type": "organic",
+              "rank_group": 1,
+              "rank_absolute": 2,
+              "position": "left",
+              "xpath": "/html[1]/body[1]/div[3]/div[1]/div[13]/div[1]/div[2]/div[2]",
+              "domain": "www.example-reviews.com",
+              "title": "The 10 Best Form Builders in 2026 (Tested)",
+              "url": "https://www.example-reviews.com/best-form-builders",
+              "breadcrumb": "https://www.example-reviews.com › best-form-builders",
+              "description": "After testing 24 tools, these are the form builders we recommend for most teams.",
+              "is_featured_snippet": false,
+              "is_malicious": false,
+              "rating": null,
+              "links": null
+            },
+            {
+              "type": "organic",
+              "rank_group": 2,
+              "rank_absolute": 3,
+              "position": "left",
+              "xpath": "/html[1]/body[1]/div[3]/div[1]/div[13]/div[1]/div[2]/div[3]",
+              "domain": "formtools.io",
+              "title": "Form Builder Buyer's Guide",
+              "url": "https://formtools.io/guide",
+              "breadcrumb": "https://formtools.io › guide",
+              "description": "Everything to check before picking a form builder.",
+              "is_featured_snippet": false,
+              "is_malicious": false,
+              "rating": null,
+              "links": null
+            },
+            {
+              "type": "people_also_ask",
+              "rank_group": 1,
+              "rank_absolute": 4,
+              "position": "left",
+              "xpath": "/html[1]/body[1]/div[3]/div[1]/div[13]/div[1]/div[2]/div[4]",
+              "items": [
+                {
+                  "type": "people_also_ask_element",
+                  "title": "Which form builder is free?",
+                  "seed_question": null,
+                  "xpath": "/html[1]/body[1]/div[3]/div[1]/div[13]/div[1]/div[2]/div[4]/div[1]",
+                  "expanded_element": []
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
