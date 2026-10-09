@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { recoverStaleAnalysis, runAnalysisAndDraft } from "@/lib/analyze";
+import { AnalysisInProgressError, recoverStaleAnalysis, runAnalysis } from "@/lib/analyze";
 import { getUser } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import type { Tracker } from "@/lib/types";
@@ -7,7 +7,11 @@ import type { Tracker } from "@/lib/types";
 export const maxDuration = 300;
 export const dynamic = "force-dynamic";
 
-/** POST /api/trackers/[id]/analyze: build the report and the first draft for a keyword the caller owns. */
+/**
+ * POST /api/trackers/[id]/analyze: build the report for a keyword the caller owns.
+ * The page is written by a separate request (POST .../draft), which the keyword
+ * page starts by itself once the report exists.
+ */
 export async function POST(_request: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
 
@@ -16,7 +20,7 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
 
   const supabase = await createClient();
   const { data: row, error } = await supabase.from("trackers").select("*").eq("id", id).maybeSingle();
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return NextResponse.json({ error: "We couldn't load that keyword." }, { status: 500 });
   if (!row) return NextResponse.json({ error: "We couldn't find that keyword." }, { status: 404 });
   let tracker = row as Tracker;
 
@@ -28,9 +32,8 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
         const { data: fresh } = await supabase.from("trackers").select("*").eq("id", id).maybeSingle();
         if (fresh) tracker = fresh as Tracker;
       }
-    } catch (err) {
-      const message = err instanceof Error ? err.message : "We couldn't check on the last report.";
-      return NextResponse.json({ error: message }, { status: 500 });
+    } catch {
+      return NextResponse.json({ error: "We couldn't check on the last report." }, { status: 500 });
     }
   }
 
@@ -50,12 +53,16 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
       { status: 422 },
     );
   }
+
   // One day with an AI Overview is enough for a first report; the report says how many
   // days it is based on, and day 7 triggers a fresh one automatically.
   try {
-    const { analysis, draft } = await runAnalysisAndDraft(id);
-    return NextResponse.json({ analysisId: analysis.id, draftId: draft.id });
+    const analysis = await runAnalysis(id);
+    return NextResponse.json({ analysisId: analysis.id });
   } catch (err) {
+    if (err instanceof AnalysisInProgressError) {
+      return NextResponse.json({ error: err.message }, { status: 409 });
+    }
     const message = err instanceof Error ? err.message : "Something went wrong building your report.";
     return NextResponse.json({ error: message }, { status: 500 });
   }

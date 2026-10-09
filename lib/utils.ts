@@ -32,6 +32,18 @@ export function domainMatches(domain: string, target: string): boolean {
   return d === t || d.endsWith(`.${t}`);
 }
 
+/**
+ * A same-site path to redirect to after sign-in, or the fallback. Rejects
+ * protocol-relative URLs ("//evil.com"), backslashes and any whitespace or
+ * control character (a tab or newline would let browsers skip the slash check).
+ */
+export function safeNextPath(value: string | null | undefined, fallback = "/app"): string {
+  if (!value) return fallback;
+  if (!/^\/(?![/\\])[^\s\\]*$/.test(value)) return fallback;
+  if (/[\u0000-\u001f\u007f]/.test(value)) return fallback;
+  return value;
+}
+
 export function formatDate(iso: string | null | undefined): string {
   if (!iso) return "";
   return new Date(iso).toLocaleDateString("en-US", {

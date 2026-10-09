@@ -3,6 +3,7 @@ import { SiteHeader } from "@/components/site/header";
 import { Footer } from "@/components/site/footer";
 import { Card } from "@/components/ui/card";
 import { Eyebrow } from "@/components/ui/eyebrow";
+import { safeNextPath } from "@/lib/utils";
 import { LoginForm } from "./login-form";
 
 export const metadata: Metadata = {
@@ -17,7 +18,8 @@ function first(value: string | string[] | undefined): string | undefined {
 
 /** Where to send the user after sign-in: a safe `next`, else the new-keyword flow, else the dashboard. */
 function resolveNext(next: string | undefined, keyword: string | undefined): string {
-  if (next && /^\/(?![/\\])/.test(next)) return next;
+  const safe = safeNextPath(next, "");
+  if (safe) return safe;
   if (keyword) return `/app/new?keyword=${encodeURIComponent(keyword)}`;
   return "/app";
 }

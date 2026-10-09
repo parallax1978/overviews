@@ -277,9 +277,13 @@ function sumUsage(total: Anthropic.Beta.BetaUsage, next: Anthropic.Beta.BetaUsag
 async function runStructured<S extends z.ZodType>(call: StructuredCall<S>): Promise<StructuredResult<z.infer<S>>> {
   const api = getClient();
   const messages: Anthropic.Beta.BetaMessageParam[] = [{ role: "user", content: call.userPrompt }];
+  // Keep only the JSON schema the helper derives: without its parse hook the SDK
+  // leaves the final message alone, so refusals and max_tokens stops reach
+  // parseOutput() and get the friendly messages below.
+  const { type: formatType, schema: formatSchema } = zodOutputFormat(call.schema);
   let outputConfig: Anthropic.Beta.BetaOutputConfig = {
     effort: "high",
-    format: zodOutputFormat(call.schema),
+    format: { type: formatType, schema: formatSchema },
   };
   let usage: Anthropic.Beta.BetaUsage | null = null;
   let message: BetaMessage | null = null;
@@ -358,7 +362,14 @@ export async function analyzeOverviews(input: AnalysisInput, hooks: AnalysisHook
     userPrompt: buildAnalysisUserPrompt(input, candidates),
     schema: AnalysisSchema,
     maxTokens: ANALYSIS_MAX_TOKENS,
-    tools: [{ type: "web_fetch_20260209", name: "web_fetch", max_uses: 10, max_content_tokens: 20000 }],
+    tools: [
+      {
+        type: "web_fetch_20260209",
+        name: "web_fetch",
+        max_uses: MAX_FETCH_CANDIDATES,
+        max_content_tokens: 12000,
+      },
+    ],
     onBlockStart: (block) => {
       if (block.type === "server_tool_use") void report(1);
       else if (block.type === "text") void report(2);

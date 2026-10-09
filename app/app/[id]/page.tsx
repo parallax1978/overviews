@@ -11,7 +11,8 @@ import { StatusChip } from "@/components/app/status-chip";
 import { Timeline } from "@/components/app/timeline";
 import { TrackerControls } from "@/components/app/tracker-controls";
 import { Chip } from "@/components/ui/chip";
-import { recoverStaleAnalysis } from "@/lib/analyze";
+import { isReportStale, recoverStaleAnalysis } from "@/lib/analyze";
+import { ReportAutoStart } from "@/components/app/report-auto-start";
 import { aggregateCitations } from "@/lib/citations";
 import { createClient } from "@/lib/supabase/server";
 import { LANGUAGES, type Analysis, type Draft, type Snapshot, type Tracker } from "@/lib/types";
@@ -97,6 +98,11 @@ export default async function TrackerPage({ params, searchParams }: PageProps) {
   const analyzing = tracker.status === "analyzing";
   // The report is done but its page was never written (the function was stopped in between).
   const needsDraft = tracker.status === "analyzed" && analysis?.status === "done" && draft?.analysis_id !== analysis.id;
+  // All days are in but no report was ever built (the cron ran out of time): build it on open.
+  const needsReport = tracker.status === "ready" && !analysis && snapshotsWithOverview > 0;
+  // A report exists but days were captured after it: offer a fresh one once all days are in.
+  const reportStale =
+    tracker.status === "analyzed" && tracker.day_count >= tracker.days_target && isReportStale(analysis, snapshots);
   const languageName = LANGUAGES.find((l) => l.code === tracker.language_code)?.name ?? tracker.language_code;
   const deviceName = tracker.device === "mobile" ? "Mobile" : "Desktop";
 
@@ -161,12 +167,17 @@ export default async function TrackerPage({ params, searchParams }: PageProps) {
         ) : activeTab === "citations" ? (
           <CitationsTable rows={citationRows} totalDays={snapshots.length} targetDomain={tracker.target_domain} />
         ) : activeTab === "report" ? (
-          <ReportView
-            tracker={tracker}
-            analysis={analysis}
-            snapshotsWithOverview={snapshotsWithOverview}
-            dayCount={tracker.day_count}
-          />
+          needsReport ? (
+            <ReportAutoStart trackerId={tracker.id} daysTarget={tracker.days_target} />
+          ) : (
+            <ReportView
+              tracker={tracker}
+              analysis={analysis}
+              snapshotsWithOverview={snapshotsWithOverview}
+              dayCount={tracker.day_count}
+              staleReport={reportStale}
+            />
+          )
         ) : needsDraft ? (
           <DraftAutoStart trackerId={tracker.id} />
         ) : (

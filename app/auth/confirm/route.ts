@@ -1,12 +1,7 @@
 import type { EmailOtpType } from "@supabase/supabase-js";
 import { NextResponse, type NextRequest } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-
-/** Only allow same-site paths ("/app/..."); anything else falls back to the dashboard. */
-function safeNextPath(value: string | null): string {
-  if (value && /^\/(?![/\\])/.test(value)) return value;
-  return "/app";
-}
+import { safeNextPath } from "@/lib/utils";
 
 /**
  * GET /auth/confirm?token_hash&type&next

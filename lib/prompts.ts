@@ -68,7 +68,7 @@ Steps 1 and 2 are done. The user message contains every captured day. Your job i
 
 - Read every day before you write anything. Count precisely from the data: a claim present on 4 of 7 days has days_present 4; a source cited on 3 days has days_cited 3. "Days" means distinct captured days, never the number of mentions. Never guess a count.
 - A day marked "[no AI Overview appeared]" is a day with no claims and no citations. It still counts toward the total number of days.
-- Then study the cited pages. The user message lists "Candidate pages to fetch", ranked by days cited. Fetch each one with the web_fetch tool, one at a time, up to the tool's limit. For a page you could read, set fetched to true and describe the real page. If a fetch fails or returns nothing useful, set fetched to false and work only from the title and snippet Google showed; say so in the structure field ("not fetched; based on Google's snippet"). Never describe a page you did not read as if you had read it.
+- Then study the cited pages. The user message lists "Candidate pages to fetch", ranked by days cited. Fetch them with the web_fetch tool, several at once if you like, up to the tool's limit. For a page you could read, set fetched to true and describe the real page. If a fetch fails or returns nothing useful, set fetched to false and work only from the title and snippet Google showed; say so in the structure field ("not fetched; based on Google's snippet"). Never describe a page you did not read as if you had read it.
 - Finish with one JSON object that follows the output schema exactly. No prose before or after it.
 
 ## Output fields

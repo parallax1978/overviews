@@ -1,8 +1,9 @@
 /**
- * Orchestrates the analysis and draft for one tracker: loads the snapshots,
- * runs the two Claude calls, and writes analyses / drafts / api_log rows with
- * the admin client. Callers must already have verified ownership (route
- * handlers) or be the secret-protected cron.
+ * Orchestrates the report and the draft for one tracker. The analysis and the
+ * draft are separate Claude calls that run in separate requests (each takes
+ * minutes), so neither one risks the platform's function time limit.
+ * Writes analyses / drafts / api_log rows with the admin client: callers must
+ * already have verified ownership (route handlers) or be the secret-protected cron.
  */
 
 import { estimateAnthropicCost, logApiCall } from "@/lib/api-log";
@@ -14,9 +15,17 @@ import {
   type AnalysisSnapshotInput,
 } from "@/lib/claude";
 import { createAdminClient } from "@/lib/supabase/admin";
-import type { Analysis, Draft, Snapshot, Tracker } from "@/lib/types";
+import type { Analysis, Draft, Snapshot, Tracker, TrackerStatus } from "@/lib/types";
 
 type Admin = ReturnType<typeof createAdminClient>;
+
+/** Thrown when a report is already being built for the tracker. */
+export class AnalysisInProgressError extends Error {
+  constructor() {
+    super("Your report is already being built. Give it a minute.");
+    this.name = "AnalysisInProgressError";
+  }
+}
 
 function errorMessage(err: unknown): string {
   return err instanceof Error ? err.message : String(err);
@@ -39,6 +48,14 @@ async function loadSnapshots(admin: Admin, trackerId: string): Promise<Snapshot[
   return (data ?? []) as Snapshot[];
 }
 
+async function loadLatestAnalysis(admin: Admin, trackerId: string, onlyDone = false): Promise<Analysis | null> {
+  let query = admin.from("analyses").select("*").eq("tracker_id", trackerId);
+  if (onlyDone) query = query.eq("status", "done");
+  const { data, error } = await query.order("created_at", { ascending: false }).limit(1).maybeSingle();
+  if (error) throw new Error(error.message);
+  return (data as Analysis | null) ?? null;
+}
+
 function toAnalysisSnapshot(s: Snapshot): AnalysisSnapshotInput {
   return {
     day_number: s.day_number,
@@ -51,8 +68,8 @@ function toAnalysisSnapshot(s: Snapshot): AnalysisSnapshotInput {
   };
 }
 
-/** Status to fall back to when an analysis fails. */
-function restingStatus(tracker: Tracker): Tracker["status"] {
+/** Status for a tracker that is not being analyzed and has no usable prior status. */
+function restingStatus(tracker: Pick<Tracker, "day_count" | "days_target">): TrackerStatus {
   return tracker.day_count >= tracker.days_target ? "ready" : "tracking";
 }
 
@@ -63,26 +80,17 @@ const STALE_ANALYSIS_MESSAGE = "This took too long and was stopped. Try again.";
 const STALE_ANALYSIS_MS = 15 * 60 * 1000;
 
 /**
- * Put a tracker that is stuck in "analyzing" back into a resting state. The
- * analysis and the draft run inside one request; when the platform stops that
- * function nothing would ever update the rows again. Idempotent and cheap, so
- * callers run it before acting on the tracker. Returns whether anything changed.
+ * Put a tracker that is stuck in "analyzing" back into a resting state. When
+ * the platform stops the function mid-run nothing would ever update the rows
+ * again. Idempotent and cheap, so callers run it before acting on the tracker.
+ * Returns whether anything changed.
  */
 export async function recoverStaleAnalysis(trackerId: string): Promise<{ recovered: boolean }> {
   const admin = createAdminClient();
   const tracker = await loadTracker(admin, trackerId);
   if (tracker.status !== "analyzing") return { recovered: false };
 
-  const { data: analysisRow, error: analysisError } = await admin
-    .from("analyses")
-    .select("*")
-    .eq("tracker_id", trackerId)
-    .order("created_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
-  if (analysisError) throw new Error(analysisError.message);
-  const analysis = analysisRow as Analysis | null;
-
+  const analysis = await loadLatestAnalysis(admin, trackerId);
   const stale = !analysis || Date.now() - new Date(analysis.created_at).getTime() > STALE_ANALYSIS_MS;
   if (!stale) return { recovered: false };
 
@@ -92,17 +100,14 @@ export async function recoverStaleAnalysis(trackerId: string): Promise<{ recover
       .update({ status: "error", step: null, error: STALE_ANALYSIS_MESSAGE })
       .eq("id", analysis.id);
     if (error) throw new Error(error.message);
-  } else if (analysis?.status === "done" && analysis.step) {
-    // The report finished but the page was never written: drop the leftover progress label.
-    await admin.from("analyses").update({ step: null }).eq("id", analysis.id);
   }
 
-  const analyzed = analysis?.status === "done";
+  const done = await loadLatestAnalysis(admin, trackerId, true);
   const { error: trackerError } = await admin
     .from("trackers")
     .update({
-      status: analyzed ? "analyzed" : restingStatus(tracker),
-      last_error: analyzed ? null : (analysis?.status === "error" && analysis.error) || STALE_ANALYSIS_MESSAGE,
+      status: done ? "analyzed" : restingStatus(tracker),
+      last_error: done ? null : STALE_ANALYSIS_MESSAGE,
     })
     .eq("id", trackerId);
   if (trackerError) throw new Error(trackerError.message);
@@ -111,23 +116,34 @@ export async function recoverStaleAnalysis(trackerId: string): Promise<{ recover
 }
 
 /**
- * Run the full pipeline for a tracker: analysis (patterns, citation research,
- * blueprint, summary) followed by the first draft. Marks the tracker
- * "analyzing" while running and "analyzed" on success. Throws on failure after
- * recording the error on the analyses row and the tracker.
+ * Build the report for a tracker: patterns, citation research, blueprint and
+ * summary. Claims the tracker atomically (status "analyzing"), so two callers
+ * cannot start two paid analyses; the loser gets AnalysisInProgressError.
+ * On success the tracker is "analyzed"; the draft is written separately
+ * (regenerateDraft), which the keyword page starts automatically.
+ * Throws on failure after recording the error on the analyses row and the tracker.
  */
-export async function runAnalysisAndDraft(trackerId: string): Promise<{ analysis: Analysis; draft: Draft }> {
+export async function runAnalysis(trackerId: string): Promise<Analysis> {
   const admin = createAdminClient();
   const tracker = await loadTracker(admin, trackerId);
+  if (tracker.status === "analyzing") throw new AnalysisInProgressError();
   const snapshots = await loadSnapshots(admin, trackerId);
   if (!snapshots.some((s) => s.has_overview)) {
     throw new Error("No AI Overview has appeared for this keyword yet");
   }
 
-  {
-    const { error } = await admin.from("trackers").update({ status: "analyzing", last_error: null }).eq("id", trackerId);
-    if (error) throw new Error(error.message);
-  }
+  // Where to put the tracker back if this run fails: its previous resting state
+  // (a paused keyword stays paused, an analyzed one keeps its old report).
+  const fallback: TrackerStatus = tracker.status;
+
+  const { data: claimed, error: claimError } = await admin
+    .from("trackers")
+    .update({ status: "analyzing", last_error: null })
+    .eq("id", trackerId)
+    .neq("status", "analyzing")
+    .select("id");
+  if (claimError) throw new Error(claimError.message);
+  if (!claimed?.length) throw new AnalysisInProgressError();
 
   const { data: inserted, error: insertError } = await admin
     .from("analyses")
@@ -135,13 +151,11 @@ export async function runAnalysisAndDraft(trackerId: string): Promise<{ analysis
     .select("*")
     .single();
   if (insertError || !inserted) {
-    await admin.from("trackers").update({ status: restingStatus(tracker) }).eq("id", trackerId);
+    await admin.from("trackers").update({ status: fallback }).eq("id", trackerId);
     throw new Error(insertError?.message ?? "Could not start the analysis");
   }
   const analysisId = (inserted as Analysis).id;
-
-  let phase: "messages:analyze" | "messages:draft" = "messages:analyze";
-  let startedAt = Date.now();
+  const startedAt = Date.now();
 
   try {
     const result = await analyzeOverviews(
@@ -176,7 +190,6 @@ export async function runAnalysisAndDraft(trackerId: string): Promise<{ analysis
       .select("*")
       .single();
     if (doneError || !doneRow) throw new Error(doneError?.message ?? "Could not save the analysis");
-    const analysis = doneRow as Analysis;
 
     await logApiCall(admin, {
       tracker_id: trackerId,
@@ -187,65 +200,16 @@ export async function runAnalysisAndDraft(trackerId: string): Promise<{ analysis
       duration_ms: Date.now() - startedAt,
     });
 
-    phase = "messages:draft";
-    startedAt = Date.now();
-    await admin.from("analyses").update({ step: "Writing your page" }).eq("id", analysisId);
-
-    const written = await writeDraft({
-      keyword: tracker.keyword,
-      blueprint: result.blueprint,
-      patterns: result.patterns,
-      citationResearch: result.citation_research,
-      stableCore: result.patterns.stable_core,
-      userEdge: tracker.user_edge,
-      targetDomain: tracker.target_domain,
-      notes: null,
-      previousDraft: null,
-    });
-
-    const { data: draftRow, error: draftError } = await admin
-      .from("drafts")
-      .insert({
-        tracker_id: trackerId,
-        analysis_id: analysisId,
-        title: written.title,
-        meta_description: written.meta_description,
-        h1: written.h1,
-        outline: written.outline,
-        content_md: written.content_md,
-        why_better_md: written.why_better_md,
-        notes: null,
-        model: written.model,
-        usage: written.usage,
-      })
-      .select("*")
-      .single();
-    if (draftError || !draftRow) throw new Error(draftError?.message ?? "Could not save the draft");
-
-    await logApiCall(admin, {
-      tracker_id: trackerId,
-      provider: "anthropic",
-      endpoint: "messages:draft",
-      status: 200,
-      cost_usd: estimateAnthropicCost(written.usage),
-      duration_ms: Date.now() - startedAt,
-    });
-
-    await admin.from("analyses").update({ step: null }).eq("id", analysisId);
     await admin.from("trackers").update({ status: "analyzed", last_error: null }).eq("id", trackerId);
-
-    return { analysis, draft: draftRow as Draft };
+    return doneRow as Analysis;
   } catch (err) {
     const message = errorMessage(err);
     await admin.from("analyses").update({ status: "error", error: message, step: null }).eq("id", analysisId);
-    await admin
-      .from("trackers")
-      .update({ status: restingStatus(tracker), last_error: message })
-      .eq("id", trackerId);
+    await admin.from("trackers").update({ status: fallback, last_error: message }).eq("id", trackerId);
     await logApiCall(admin, {
       tracker_id: trackerId,
       provider: "anthropic",
-      endpoint: phase,
+      endpoint: "messages:analyze",
       status: anthropicErrorStatus(err),
       cost_usd: 0,
       duration_ms: Date.now() - startedAt,
@@ -256,23 +220,15 @@ export async function runAnalysisAndDraft(trackerId: string): Promise<{ analysis
 }
 
 /**
- * Write a new draft from the latest finished analysis, revising the latest
- * draft according to the user's notes. Returns the new drafts row.
+ * Write a draft from the latest finished analysis. With `notes`, revises the
+ * latest draft of that analysis; otherwise writes a fresh page (a draft left
+ * over from an older analysis is not reused). Returns the new drafts row.
  */
 export async function regenerateDraft(trackerId: string, notes?: string | null): Promise<Draft> {
   const admin = createAdminClient();
   const tracker = await loadTracker(admin, trackerId);
 
-  const { data: analysisRow, error: analysisError } = await admin
-    .from("analyses")
-    .select("*")
-    .eq("tracker_id", trackerId)
-    .eq("status", "done")
-    .order("created_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
-  if (analysisError) throw new Error(analysisError.message);
-  const analysis = analysisRow as Analysis | null;
+  const analysis = await loadLatestAnalysis(admin, trackerId, true);
   if (!analysis?.patterns || !analysis.blueprint) {
     throw new Error("Build the report first, then you can write a new draft");
   }
@@ -281,6 +237,7 @@ export async function regenerateDraft(trackerId: string, notes?: string | null):
     .from("drafts")
     .select("*")
     .eq("tracker_id", trackerId)
+    .eq("analysis_id", analysis.id)
     .order("created_at", { ascending: false })
     .limit(1)
     .maybeSingle();
@@ -300,9 +257,10 @@ export async function regenerateDraft(trackerId: string, notes?: string | null):
       userEdge: tracker.user_edge,
       targetDomain: tracker.target_domain,
       notes: cleanNotes,
-      previousDraft: previous?.content_md
-        ? { title: previous.title ?? "", content_md: previous.content_md }
-        : null,
+      previousDraft:
+        cleanNotes && previous?.content_md
+          ? { title: previous.title ?? "", content_md: previous.content_md }
+          : null,
     });
 
     const { data: draftRow, error: draftError } = await admin
@@ -346,4 +304,21 @@ export async function regenerateDraft(trackerId: string, notes?: string | null):
     });
     throw err;
   }
+}
+
+/** Report then draft, back to back. For scripts and callers with their own time budget. */
+export async function runAnalysisAndDraft(trackerId: string): Promise<{ analysis: Analysis; draft: Draft }> {
+  const analysis = await runAnalysis(trackerId);
+  const draft = await regenerateDraft(trackerId, null);
+  return { analysis, draft };
+}
+
+/** True when a finished analysis exists but a newer snapshot has landed since it was built. */
+export function isReportStale(
+  analysis: Pick<Analysis, "status" | "created_at"> | null,
+  snapshots: Pick<Snapshot, "captured_at">[],
+): boolean {
+  if (!analysis || analysis.status !== "done") return false;
+  const latest = snapshots.reduce((max, s) => (s.captured_at > max ? s.captured_at : max), "");
+  return Boolean(latest) && latest > analysis.created_at;
 }

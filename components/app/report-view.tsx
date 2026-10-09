@@ -27,6 +27,8 @@ export interface ReportViewProps {
   snapshotsWithOverview: number;
   /** Days captured so far. */
   dayCount: number;
+  /** All days are in and the report predates the newest capture: offer a fresh one. */
+  staleReport?: boolean;
 }
 
 const REPORT_CONTENTS = [
@@ -37,7 +39,7 @@ const REPORT_CONTENTS = [
 ];
 
 /** Report tab: intro and "Analyze now" before the report exists, progress while it runs, then the report. */
-export function ReportView({ tracker, analysis, snapshotsWithOverview, dayCount }: ReportViewProps) {
+export function ReportView({ tracker, analysis, snapshotsWithOverview, dayCount, staleReport = false }: ReportViewProps) {
   if (tracker.status === "analyzing" || analysis?.status === "running") {
     return <Progress step={analysis?.step ?? null} />;
   }
@@ -74,7 +76,22 @@ export function ReportView({ tracker, analysis, snapshotsWithOverview, dayCount 
     );
   }
 
-  return <Report tracker={tracker} analysis={analysis} snapshotsWithOverview={snapshotsWithOverview} />;
+  return (
+    <div className="space-y-5">
+      {staleReport ? (
+        <Card className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <p className="font-semibold text-ink">All {tracker.days_target} days are in.</p>
+            <p className="mt-1 text-sm text-ink-muted">
+              This report was built before the last captures. A fresh one uses every day.
+            </p>
+          </div>
+          <AnalyzeButton trackerId={tracker.id} disabled={false} reason={null} label="Update the report" />
+        </Card>
+      ) : null}
+      <Report tracker={tracker} analysis={analysis} snapshotsWithOverview={snapshotsWithOverview} />
+    </div>
+  );
 }
 
 // ---------------------------------------------------------------------------

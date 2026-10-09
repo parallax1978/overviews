@@ -9,7 +9,8 @@ import { findAiOverviewItem, normalizeAiOverview } from "@/lib/overview";
 export const DATAFORSEO_ENDPOINT = "serp/google/organic/live/advanced";
 
 const API_URL = `https://api.dataforseo.com/v3/${DATAFORSEO_ENDPOINT}`;
-const TIMEOUT_MS = 90_000;
+/** Per attempt. Two attempts plus the retry pause stay under the 120s the add-keyword action allows. */
+const TIMEOUT_MS = 50_000;
 const RETRY_DELAY_MS = 1_500;
 const OK = 20000;
 
@@ -55,10 +56,18 @@ function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+/**
+ * DataForSEO decodes "%xx" sequences and "+" inside keywords, so a literal
+ * percent or plus sign must be sent encoded to arrive as typed.
+ */
+export function encodeKeyword(keyword: string): string {
+  return keyword.trim().replace(/%/g, "%25").replace(/\+/g, "%2B");
+}
+
 /** The single task object sent to DataForSEO for one capture. */
 export function buildSerpTask(req: CaptureRequest): Record<string, unknown> {
   return {
-    keyword: req.keyword,
+    keyword: encodeKeyword(req.keyword),
     location_code: req.location_code,
     language_code: req.language_code,
     device: req.device,

@@ -4,21 +4,27 @@
  * (server actions) or be the secret-protected cron.
  */
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { runAnalysisAndDraft } from "@/lib/analyze";
+import { regenerateDraft, runAnalysis } from "@/lib/analyze";
 import { logApiCall } from "@/lib/api-log";
 import { DATAFORSEO_ENDPOINT, DataForSeoError, fetchSerpWithAiOverview } from "@/lib/dataforseo";
 import { computeDiff } from "@/lib/diff";
-import { normalizeAiOverview } from "@/lib/overview";
+import { normalizeAiOverview, type NormalizedOverview } from "@/lib/overview";
+import { isCaptureDue, nextCaptureAt } from "@/lib/schedule";
 import { createAdminClient } from "@/lib/supabase/admin";
 import type { Snapshot, Tracker, TrackerStatus } from "@/lib/types";
 import { domainMatches } from "@/lib/utils";
 
-const DAY_MS = 24 * 60 * 60 * 1000;
 const UNIQUE_VIOLATION = "23505";
 const DEFAULT_LIMIT = 200;
 const DEFAULT_CONCURRENCY = 4;
-/** Stop starting new work after this long so the 300s function returns cleanly. */
-const TIME_BUDGET_MS = 240_000;
+/** Stop starting new captures after this long so the 300s function returns cleanly. */
+const CAPTURE_BUDGET_MS = 240_000;
+/** Only start a report (about 3 minutes) while this much of the function's time is still unused. */
+const ANALYSIS_START_BUDGET_MS = 60_000;
+/** Also write the draft (about 2 minutes) only when the report finished early enough. */
+const DRAFT_START_BUDGET_MS = 90_000;
+/** Reports to pick up per run for trackers that reached their target earlier but were never analyzed. */
+const PENDING_REPORTS_PER_RUN = 1;
 
 export interface CaptureRunSummary {
   captured: string[];
@@ -26,6 +32,8 @@ export interface CaptureRunSummary {
   analyzed: string[];
   analysisFailed: { trackerId: string; error: string }[];
 }
+
+export { isCaptureDue, nextCaptureAt };
 
 /**
  * Fetches today's SERP, stores the snapshot for `dayNumber` (default: the next
@@ -77,8 +85,10 @@ export async function captureSnapshot(
 }
 
 /**
- * Captures every tracker whose next_capture_at has passed, four at a time,
- * and auto-runs the analysis for trackers that just reached their day target.
+ * Captures every tracker that is due today, four at a time, then builds the
+ * report for trackers that just reached their day target (one at a time,
+ * while the function still has time). Reports it could not start are built
+ * when the user next opens the keyword page.
  */
 export async function runDueCaptures(opts?: {
   now?: Date;
@@ -94,42 +104,35 @@ export async function runDueCaptures(opts?: {
     .from("trackers")
     .select("id, status, keep_tracking, day_count, days_target, next_capture_at")
     .lte("next_capture_at", now.toISOString())
-    .or("status.eq.tracking,and(keep_tracking.eq.true,status.in.(analyzed,ready))")
+    .in("status", ["tracking", "analyzed", "ready"])
     .order("next_capture_at", { ascending: true })
     .limit(limit);
   if (error) throw new Error(`Could not load due trackers: ${error.message}`);
 
-  const due = (data ?? []) as Pick<Tracker, "id" | "status">[];
+  type DueRow = Pick<Tracker, "id" | "status" | "keep_tracking" | "day_count" | "days_target" | "next_capture_at">;
+  const due = ((data ?? []) as DueRow[]).filter((t) => isCaptureDue(t, now));
+
   const summary: CaptureRunSummary = { captured: [], failed: [], analyzed: [], analysisFailed: [] };
   const startedAt = Date.now();
-  const overBudget = () => Date.now() - startedAt > TIME_BUDGET_MS;
+  const elapsed = () => Date.now() - startedAt;
+
+  // Reports owed from earlier runs: trackers at their target that were never analyzed.
+  const pending = await loadPendingReports(admin, PENDING_REPORTS_PER_RUN);
+  const needsReport: string[] = [...pending];
 
   type Job = () => Promise<void>;
   const queue: Job[] = [];
 
-  const analysisJob = (trackerId: string): Job => async () => {
-    if (overBudget()) {
-      summary.analysisFailed.push({ trackerId, error: "skipped: time budget" });
-      return;
-    }
-    try {
-      await runAnalysisAndDraft(trackerId);
-      summary.analyzed.push(trackerId);
-    } catch (err) {
-      summary.analysisFailed.push({ trackerId, error: shortErrorMessage(err) });
-    }
-  };
-
-  const captureJob = (before: Pick<Tracker, "id" | "status">): Job => async () => {
-    if (overBudget()) {
+  const captureJob = (before: DueRow): Job => async () => {
+    if (elapsed() > CAPTURE_BUDGET_MS) {
       summary.failed.push({ trackerId: before.id, error: "skipped: time budget" });
       return;
     }
     try {
       const { tracker: after } = await captureSnapshot(before.id);
       summary.captured.push(before.id);
-      if (before.status === "tracking" && after.status === "ready") {
-        queue.push(analysisJob(before.id));
+      if (before.day_count < before.days_target && after.day_count >= after.days_target) {
+        needsReport.push(before.id);
       }
     } catch (err) {
       summary.failed.push({ trackerId: before.id, error: shortErrorMessage(err) });
@@ -142,6 +145,21 @@ export async function runDueCaptures(opts?: {
     for (let job = queue.shift(); job; job = queue.shift()) await job();
   };
   await Promise.all(Array.from({ length: Math.min(concurrency, queue.length) }, worker));
+
+  // Reports run one at a time: each is a single multi-minute Claude call.
+  for (const trackerId of [...new Set(needsReport)]) {
+    if (elapsed() > ANALYSIS_START_BUDGET_MS) {
+      summary.analysisFailed.push({ trackerId, error: "skipped: time budget" });
+      continue;
+    }
+    try {
+      await runAnalysis(trackerId);
+      summary.analyzed.push(trackerId);
+      if (elapsed() < DRAFT_START_BUDGET_MS) await regenerateDraft(trackerId, null);
+    } catch (err) {
+      summary.analysisFailed.push({ trackerId, error: shortErrorMessage(err) });
+    }
+  }
 
   return summary;
 }
@@ -168,6 +186,25 @@ async function loadSnapshot(
     .maybeSingle();
   if (error) throw new Error(`Could not load snapshot: ${error.message}`);
   return (data as Snapshot | null) ?? null;
+}
+
+/** Trackers at their day target with no analysis at all, oldest first. */
+async function loadPendingReports(admin: SupabaseClient, limit: number): Promise<string[]> {
+  const { data, error } = await admin
+    .from("trackers")
+    .select("id, analyses(id)")
+    .eq("status", "ready")
+    .order("created_at", { ascending: true })
+    .limit(50);
+  if (error) {
+    console.error("pending reports query failed", error.message);
+    return [];
+  }
+  const rows = (data ?? []) as { id: string; analyses: { id: string }[] | null }[];
+  return rows
+    .filter((r) => !r.analyses || r.analyses.length === 0)
+    .slice(0, limit)
+    .map((r) => r.id);
 }
 
 async function storeSnapshot(
@@ -204,20 +241,35 @@ async function storeSnapshot(
 
   if (insertError) {
     if (insertError.code === UNIQUE_VIOLATION) {
-      // Another run already stored this day (overlapping cron): reuse it.
+      // Another run already stored this day (overlapping cron, or a retry after a
+      // partial failure): keep that row, but still move the tracker forward.
       const existing = await loadSnapshot(admin, tracker.id, dayNumber);
-      if (existing) return { snapshot: existing, tracker: await loadTracker(admin, tracker.id) };
+      if (existing) {
+        const advanced = await advanceTracker(admin, tracker, dayNumber, overview);
+        return { snapshot: existing, tracker: advanced };
+      }
     }
     throw new Error(`Could not save snapshot: ${insertError.message}`);
   }
 
+  const advanced = await advanceTracker(admin, tracker, dayNumber, overview);
+  return { snapshot: inserted as Snapshot, tracker: advanced };
+}
+
+/** Day count, next capture time, status transitions and the "you were cited" mark after a capture. */
+async function advanceTracker(
+  admin: SupabaseClient,
+  tracker: Tracker,
+  dayNumber: number,
+  overview: NormalizedOverview,
+): Promise<Tracker> {
   const dayCount = Math.max(tracker.day_count, dayNumber);
   let status: TrackerStatus = tracker.status === "error" ? "tracking" : tracker.status;
   if (status === "tracking" && dayCount >= tracker.days_target) status = "ready";
 
   const update: Partial<Tracker> = {
     day_count: dayCount,
-    next_capture_at: new Date(Date.now() + DAY_MS).toISOString(),
+    next_capture_at: nextCaptureAt().toISOString(),
     last_error: null,
     status,
   };
@@ -234,8 +286,7 @@ async function storeSnapshot(
     .select("*")
     .single();
   if (updateError) throw new Error(`Could not update tracker: ${updateError.message}`);
-
-  return { snapshot: inserted as Snapshot, tracker: updated as Tracker };
+  return updated as Tracker;
 }
 
 async function markCaptureFailed(

@@ -7,7 +7,8 @@ import { NewKeywordForm } from "./new-keyword-form";
 export const metadata: Metadata = { title: "New keyword" };
 
 /** The day-1 capture (10 to 20 seconds) runs inside this page's server action. */
-export const maxDuration = 60;
+// The day-1 capture runs inside the form action: two DataForSEO attempts of up to 50s each.
+export const maxDuration = 120;
 
 /** "Add keyword" screen. `?keyword=` (from the landing page input) prefills the search box. */
 export default async function NewKeywordPage({
