@@ -36,10 +36,11 @@ export const EMPTY_TRACKER_STATS: TrackerStats = {
 
 const ERROR_PREVIEW_LENGTH = 90;
 
-/** True when the daily capture will run again for this tracker (same rule as the cron). */
+/** True when the daily capture will run again for this tracker (same rule as the cron's isCaptureDue). */
 function capturesContinue(t: Tracker): boolean {
   if (t.status === "tracking") return true;
-  return t.keep_tracking && (t.status === "analyzed" || t.status === "ready");
+  if (t.status !== "analyzed" && t.status !== "ready") return false;
+  return t.keep_tracking || t.day_count < t.days_target;
 }
 
 /** One dashboard row: links to the keyword page and shows today's numbers at a glance. */

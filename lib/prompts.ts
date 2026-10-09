@@ -65,11 +65,19 @@ export interface DraftInput {
   previousDraft: { title: string; content_md: string } | null;
 }
 
-/** One line for the prompts explaining how other brands may be treated. */
-export function competitorPolicyText(policy: CompetitorPolicy): string {
-  return policy === "compare"
-    ? "The author wants a fair comparison page: other brands, products and companies may be named and compared honestly."
-    : "Never recommend, rank, praise or link to other brands, products or companies. The page positions the author's own site or product as the answer (honestly, with no invented claims) and otherwise answers in substance: what matters, what to check, what to avoid, what it costs. A competitor may be named only to quote what a source claims when settling a contradiction, neutrally.";
+/** The brand policy as a prompt paragraph, worded for whether the author gave a site or an edge. */
+export function competitorPolicyText(
+  policy: CompetitorPolicy,
+  context: { hasSite: boolean; hasEdge: boolean } = { hasSite: false, hasEdge: false },
+): string {
+  if (policy === "compare") {
+    return "The author wants a fair comparison page: other brands, products and companies may be named and compared honestly.";
+  }
+  const positioning =
+    context.hasSite || context.hasEdge
+      ? "The page positions the author's own site, product or experience as the answer, honestly and with no invented claims, and otherwise answers in substance: what matters, what to check, what to avoid, what it costs."
+      : "No author site or product was given, so the page answers in substance only: what matters, what to check, what to avoid, what it costs. It does not invent an author product; where a recommendation would be needed, it gives the criteria instead and leaves a placeholder for the author's own offer.";
+  return `Never recommend, rank, praise or link to other brands, products or companies. ${positioning} A competitor may be named only to quote what a source claims when settling a contradiction, neutrally.`;
 }
 
 export const ANALYSIS_SYSTEM_PROMPT = `You are a senior SEO analyst. You apply Jake Ward's method for earning a citation in Google's AI Overview:
@@ -248,7 +256,14 @@ export function buildAnalysisUserPrompt(input: AnalysisInput, candidateUrls: Can
     parts.push("None. Google cited no pages, so set citation_research to an empty list.");
   }
 
-  parts.push("", "## Brand policy for the page", competitorPolicyText(input.competitorPolicy));
+  parts.push(
+    "",
+    "## Brand policy for the page",
+    competitorPolicyText(input.competitorPolicy, {
+      hasSite: Boolean(input.targetDomain),
+      hasEdge: Boolean(input.userEdge?.trim()),
+    }),
+  );
   if (input.targetDomain) {
     parts.push("", "## The user's website", input.targetDomain);
   }
@@ -356,7 +371,14 @@ export function buildDraftUserPrompt(input: DraftInput): string {
   if (input.targetDomain) {
     parts.push("", "## The author's website", input.targetDomain);
   }
-  parts.push("", "## Brand policy (binding)", competitorPolicyText(input.competitorPolicy));
+  parts.push(
+    "",
+    "## Brand policy (binding)",
+    competitorPolicyText(input.competitorPolicy, {
+      hasSite: Boolean(input.targetDomain),
+      hasEdge: Boolean(input.userEdge?.trim()),
+    }),
+  );
 
   if (input.previousDraft) {
     parts.push(
