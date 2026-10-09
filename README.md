@@ -1,36 +1,101 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Legiit Overviews
 
-## Getting Started
+Track one Google AI Overview for 7 days, see what Google keeps citing, and get a page written to
+beat it. Built on Next.js, Supabase, DataForSEO, Claude, and Vercel.
 
-First, run the development server:
+The product plan is in [`PLAN.md`](./PLAN.md). Conventions for contributors (and Claude Code) are
+in [`CLAUDE.md`](./CLAUDE.md).
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+## How it works
+
+1. **Add a keyword.** We capture today's AI Overview immediately with DataForSEO.
+2. **We watch it for 7 days.** A daily cron captures the full answer and every citation.
+3. **You get the report and the page.** On day 7 Claude finds the patterns, reads the most-cited
+   pages, and writes a page built around the findings, with placeholders for your own data.
+4. **Keep tracking.** After you publish, we keep checking and tell you when your site gets cited.
+
+## Setup (about 20 minutes)
+
+### 1. Supabase
+
+1. Create a project at https://supabase.com/dashboard.
+2. Open the SQL editor and run `supabase/migrations/0001_init.sql`
+   (or `supabase link` + `supabase db push` with the CLI).
+3. Authentication: follow [`docs/auth-setup.md`](./docs/auth-setup.md). The app uses email codes
+   and magic links, no passwords.
+4. Project Settings -> API: copy the project URL, the publishable (anon) key, and the service
+   role key.
+
+### 2. DataForSEO
+
+1. Create an account at https://app.dataforseo.com and add the minimum $50 balance.
+2. API Access: copy the API login and password.
+
+Each daily capture costs about $0.004 (Live SERP $0.002 plus the async AI Overview surcharge,
+refunded when the overview is cached or absent), about $0.03 per keyword week.
+
+### 3. Anthropic
+
+Create an API key at https://console.anthropic.com. Analysis and writing use `claude-opus-5-5`.
+Expect roughly $0.50 to $0.80 per keyword for the report and the draft.
+
+### 4. Environment variables
+
+Copy `.env.example` to `.env.local` and fill it in:
+
+```
+NEXT_PUBLIC_SUPABASE_URL=
+NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=
+SUPABASE_SERVICE_ROLE_KEY=
+DATAFORSEO_LOGIN=
+DATAFORSEO_PASSWORD=
+ANTHROPIC_API_KEY=
+CRON_SECRET=            # any random string, 32+ characters
+NEXT_PUBLIC_APP_URL=    # http://localhost:3000 locally, your Vercel URL in production
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+### 5. Run locally
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```
+npm install
+npm run dev
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+Open http://localhost:3000, sign in with your email, add a keyword. Day 1 is captured while you
+wait. To simulate the next day's capture locally:
 
-## Learn More
+```
+node scripts/capture-now.mjs
+```
 
-To learn more about Next.js, take a look at the following resources:
+### 6. Deploy to Vercel
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+1. Import the repo at https://vercel.com/new. The Pro plan is recommended (commercial use, and
+   precise cron timing). Hobby works for testing: its daily cron runs within an hour of 06:00 UTC.
+2. Add every variable from step 4 in Project Settings -> Environment Variables.
+3. Deploy. `vercel.json` registers the daily cron at `/api/cron/capture`; Vercel sends
+   `Authorization: Bearer <CRON_SECRET>` automatically.
+4. In Supabase, add `https://<your-domain>/auth/confirm` to the auth Redirect URLs.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Commands
 
-## Deploy on Vercel
+```
+npm run dev          # local dev server
+npm run typecheck    # tsc --noEmit
+npm run lint         # eslint
+npm run test         # vitest unit tests
+npm run build        # production build
+node scripts/capture-now.mjs            # trigger the daily capture against APP_URL
+node scripts/dataforseo-probe.mjs "best form builder" --save   # one real DataForSEO call, saves the response
+```
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## Project layout
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+```
+app/                 routes: landing, login, auth callbacks, /app dashboard, /api
+components/          ui primitives, brand, site chrome, app widgets
+lib/                 env, types, utils, auth, supabase clients, dataforseo, claude, capture, analyze
+supabase/migrations  SQL schema (RLS enabled)
+scripts/             plain Node scripts for operators
+tests/               vitest tests and response fixtures
+```
