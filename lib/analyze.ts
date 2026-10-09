@@ -184,6 +184,7 @@ export async function runAnalysis(trackerId: string): Promise<Analysis> {
         snapshots: snapshots.map(toAnalysisSnapshot),
         targetDomain: tracker.target_domain,
         userEdge: tracker.user_edge,
+        competitorPolicy: tracker.competitor_policy ?? "avoid",
       },
       {
         onStep: async (step) => {
@@ -276,6 +277,7 @@ export async function regenerateDraft(trackerId: string, notes?: string | null):
       stableCore: analysis.patterns.stable_core,
       userEdge: tracker.user_edge,
       targetDomain: tracker.target_domain,
+      competitorPolicy: tracker.competitor_policy ?? "avoid",
       notes: cleanNotes,
       previousDraft:
         cleanNotes && previous?.content_md

@@ -81,13 +81,20 @@ const sampleAnalysis = {
       uses_lists: true,
       data_included: ["prices as of 2026"],
       gaps: ["no setup time comparison"],
+      how_to_beat: "Open with the verdict it never gives and add the setup-time table it lacks.",
     },
   ],
   blueprint: {
     page_goal: "Help a small business pick a form builder in five minutes.",
     target_question: "What is the best form builder?",
+    winning_angle: "The only page with checked free-plan limits for every tool, dated.",
+    gaps_to_fill: [{ gap: "free-plan response limits side by side", found_in: "none of the eight pages" }],
+    contradictions_to_settle: [
+      { topic: "Typeform starting price", what_sources_say: "ventureharbour.com says $35; freeformbuilders.com says $29" },
+    ],
     must_cover: [{ topic: "pricing", why: "cited in 17 of 21 samples" }],
-    must_mention: ["Typeform", "Jotform"],
+    terms_to_cover: ["conditional logic", "response limits"],
+    brands_google_names: ["Typeform", "Jotform"],
     recommended_format: "direct answer, then comparison table, then per-option sections",
     opening_answer: "Typeform is the best form builder for most small teams.",
     sections: [{ heading: "Quick answer", purpose: "answer the question", format: "paragraph" as const }],
@@ -175,6 +182,7 @@ const input: AnalysisInput = {
   snapshots,
   targetDomain: "example.com",
   userEdge: "We tested setup time for 12 tools.",
+  competitorPolicy: "avoid",
 };
 
 // Two days x two samples. zapier is cited in 3 of 4 samples; typeform and

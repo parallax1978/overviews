@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { z } from "zod";
 import { requireUser } from "@/lib/auth";
 import { captureSnapshot } from "@/lib/capture";
+import { nextCaptureAt } from "@/lib/schedule";
 import { createClient } from "@/lib/supabase/server";
 import { DEFAULT_DAYS_TARGET, LANGUAGES, LOCATIONS, type Tracker } from "@/lib/types";
 import { normalizeDomain } from "@/lib/utils";
@@ -14,7 +15,6 @@ export interface CreateTrackerState {
   error: string;
 }
 
-const DAY_MS = 24 * 60 * 60 * 1000;
 const DOMAIN_PATTERN = /^[a-z0-9-]+(\.[a-z0-9-]+)+$/;
 
 const formSchema = z.object({
@@ -44,6 +44,7 @@ const formSchema = z.object({
     .trim()
     .max(2000, "Keep your edge under 2,000 characters.")
     .transform((value) => (value.length > 0 ? value : null)),
+  competitor_policy: z.enum(["avoid", "compare"]).catch("avoid"),
 });
 
 function field(formData: FormData, name: string): string {
@@ -67,6 +68,7 @@ export async function createTrackerAction(
     language_code: field(formData, "language_code"),
     target_domain: field(formData, "target_domain"),
     user_edge: field(formData, "user_edge"),
+    competitor_policy: field(formData, "competitor_policy") || "avoid",
   });
   if (!parsed.success) {
     return { error: parsed.error.issues[0]?.message ?? "Please check the form and try again." };
@@ -87,10 +89,11 @@ export async function createTrackerAction(
       device: "desktop",
       target_domain: input.target_domain,
       user_edge: input.user_edge,
+      competitor_policy: input.competitor_policy,
       status: "tracking",
       days_target: DEFAULT_DAYS_TARGET,
       day_count: 0,
-      next_capture_at: new Date(Date.now() + DAY_MS).toISOString(),
+      next_capture_at: nextCaptureAt().toISOString(),
     })
     .select("id")
     .single();

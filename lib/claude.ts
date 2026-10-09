@@ -105,13 +105,18 @@ export const CitationResearchItemSchema = z.object({
   uses_lists: z.boolean(),
   data_included: z.array(z.string()),
   gaps: z.array(z.string()),
+  how_to_beat: z.string(),
 }) satisfies z.ZodType<CitationResearchItem>;
 
 export const BlueprintSchema = z.object({
   page_goal: z.string(),
   target_question: z.string(),
+  winning_angle: z.string(),
+  gaps_to_fill: z.array(z.object({ gap: z.string(), found_in: z.string() })),
+  contradictions_to_settle: z.array(z.object({ topic: z.string(), what_sources_say: z.string() })),
   must_cover: z.array(z.object({ topic: z.string(), why: z.string() })),
-  must_mention: z.array(z.string()),
+  terms_to_cover: z.array(z.string()),
+  brands_google_names: z.array(z.string()),
   recommended_format: z.string(),
   opening_answer: z.string(),
   sections: z.array(

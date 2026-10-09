@@ -385,6 +385,9 @@ function Report({
                   {item.gaps.length > 0 ? (
                     <Fact label="What it misses" value={<BulletList items={item.gaps} tone="warn" />} />
                   ) : null}
+                  {item.how_to_beat ? (
+                    <Fact label="How to beat it" value={<span className="font-medium text-good">{item.how_to_beat}</span>} />
+                  ) : null}
                 </dl>
               </li>
             ))}
@@ -393,7 +396,7 @@ function Report({
       ) : null}
 
       {blueprint ? (
-        <Section eyebrow="Your page blueprint" title="What your page needs to do">
+        <Section eyebrow="Your page blueprint" title="How your page beats them">
           <Card>
             <div className="flex items-start gap-3">
               <BookOpen className="mt-1 h-5 w-5 shrink-0 text-brand" aria-hidden="true" />
@@ -404,6 +407,41 @@ function Report({
                 <p className="font-semibold text-ink">{blueprint.target_question}</p>
               </div>
             </div>
+
+            {blueprint.winning_angle ? (
+              <div className="mt-5 rounded-xl bg-good-soft px-4 py-3">
+                <p className="text-sm font-semibold text-good">Your winning angle</p>
+                <p className="mt-1 text-sm text-ink">{blueprint.winning_angle}</p>
+              </div>
+            ) : null}
+
+            {(blueprint.gaps_to_fill ?? []).length > 0 ? (
+              <div className="mt-5">
+                <p className="text-sm font-semibold text-ink">Gaps to fill (what no cited page gives)</p>
+                <ul className="mt-2 divide-y divide-line rounded-xl border border-line">
+                  {blueprint.gaps_to_fill.map((item, index) => (
+                    <li key={index} className="px-4 py-2.5 text-sm">
+                      <span className="font-medium text-ink">{item.gap}</span>
+                      {item.found_in ? <span className="text-ink-muted"> · missing from {item.found_in}</span> : null}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
+
+            {(blueprint.contradictions_to_settle ?? []).length > 0 ? (
+              <div className="mt-5">
+                <p className="text-sm font-semibold text-ink">Contradictions to settle</p>
+                <ul className="mt-2 divide-y divide-line rounded-xl border border-line">
+                  {blueprint.contradictions_to_settle.map((item, index) => (
+                    <li key={index} className="px-4 py-2.5 text-sm">
+                      <span className="font-medium text-ink">{item.topic}</span>
+                      {item.what_sources_say ? <span className="text-ink-muted"> · {item.what_sources_say}</span> : null}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
 
             {blueprint.opening_answer ? (
               <div className="mt-5">
@@ -422,7 +460,7 @@ function Report({
 
             {blueprint.must_cover.length > 0 ? (
               <div className="mt-5">
-                <p className="text-sm font-semibold text-ink">Must cover</p>
+                <p className="text-sm font-semibold text-ink">Questions the page must answer</p>
                 <ul className="mt-2 divide-y divide-line rounded-xl border border-line">
                   {blueprint.must_cover.map((item, index) => (
                     <li key={index} className="px-4 py-2.5 text-sm">
@@ -434,11 +472,24 @@ function Report({
               </div>
             ) : null}
 
-            {blueprint.must_mention.length > 0 ? (
+            {(blueprint.terms_to_cover ?? []).length > 0 ? (
               <div className="mt-5">
-                <p className="text-sm font-semibold text-ink">Must mention</p>
+                <p className="text-sm font-semibold text-ink">Terms to explain</p>
                 <div className="mt-2">
-                  <ChipList items={blueprint.must_mention} tone="brand" />
+                  <ChipList items={blueprint.terms_to_cover} tone="brand" />
+                </div>
+              </div>
+            ) : null}
+
+            {(blueprint.brands_google_names ?? []).length > 0 ? (
+              <div className="mt-5">
+                <p className="text-sm font-semibold text-ink">Brands Google named</p>
+                <p className="mt-0.5 text-xs text-ink-muted">
+                  For reference only. Your page does not need to mention them; the draft follows your
+                  &ldquo;name other brands&rdquo; setting.
+                </p>
+                <div className="mt-2">
+                  <ChipList items={blueprint.brands_google_names} tone="neutral" />
                 </div>
               </div>
             ) : null}

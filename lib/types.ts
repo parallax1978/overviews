@@ -12,6 +12,8 @@ export type TrackerStatus =
   | "paused" // user paused daily capture
   | "error"; // day-1 capture failed; user can retry
 
+export type CompetitorPolicy = "avoid" | "compare";
+
 export interface Tracker {
   id: string;
   user_id: string;
@@ -22,6 +24,8 @@ export interface Tracker {
   device: "desktop" | "mobile";
   target_domain: string | null;
   user_edge: string | null;
+  /** "avoid": the written page never recommends other brands (default). "compare": it may name them in a fair comparison. */
+  competitor_policy: CompetitorPolicy;
   status: TrackerStatus;
   days_target: number;
   day_count: number;
@@ -123,13 +127,26 @@ export interface CitationResearchItem {
   uses_lists: boolean;
   data_included: string[];
   gaps: string[];
+  /** The concrete way the new page beats this one. */
+  how_to_beat: string;
 }
 
+/** The plan for a page that beats every cited page, not one that matches them. */
 export interface PageBlueprint {
   page_goal: string;
   target_question: string;
+  /** The one thing that makes this page the best answer. */
+  winning_angle: string;
+  /** What no cited page gives the searcher, and which pages lack it. */
+  gaps_to_fill: { gap: string; found_in: string }[];
+  /** Where the cited pages disagree; the new page settles it with checked facts. */
+  contradictions_to_settle: { topic: string; what_sources_say: string }[];
+  /** The questions the searcher has, each with the evidence it matters. */
   must_cover: { topic: string; why: string }[];
-  must_mention: string[];
+  /** Non-brand terms and concepts the searcher expects (policies, metrics, risks, steps). */
+  terms_to_cover: string[];
+  /** Brands Google named, for reference only; the page is not required to mention them. */
+  brands_google_names: string[];
   recommended_format: string;
   opening_answer: string;
   sections: {

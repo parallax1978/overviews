@@ -112,6 +112,31 @@ export function NewKeywordForm({ initialKeyword = "" }: { initialKeyword?: strin
             your product. We use it when writing your page.
           </p>
         </div>
+
+        <fieldset>
+          <legend className={labelClass}>Name other brands in your page?</legend>
+          <div className="mt-2 space-y-2">
+            <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-line px-4 py-3 text-sm has-[:checked]:border-brand has-[:checked]:bg-brand-faint">
+              <input type="radio" name="competitor_policy" value="avoid" defaultChecked className="mt-1 accent-brand" />
+              <span>
+                <span className="font-medium text-ink">No</span>
+                <span className="block text-ink-muted">
+                  The page answers the question on its own terms and never recommends a competitor. Best when
+                  you are the answer.
+                </span>
+              </span>
+            </label>
+            <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-line px-4 py-3 text-sm has-[:checked]:border-brand has-[:checked]:bg-brand-faint">
+              <input type="radio" name="competitor_policy" value="compare" className="mt-1 accent-brand" />
+              <span>
+                <span className="font-medium text-ink">Yes, as a fair comparison</span>
+                <span className="block text-ink-muted">
+                  The page may name and compare other brands honestly. Best for roundup or review pages.
+                </span>
+              </span>
+            </label>
+          </div>
+        </fieldset>
       </Card>
 
       {state?.error ? (

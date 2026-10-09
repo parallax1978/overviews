@@ -37,6 +37,7 @@ async function main() {
       languageCode: "en",
       targetDomain: null,
       userEdge: null,
+      competitorPolicy: "avoid",
       snapshots: [
         {
           day_number: 1,
@@ -78,6 +79,7 @@ async function main() {
     stableCore: analysis.patterns.stable_core,
     userEdge: null,
     targetDomain: null,
+    competitorPolicy: "avoid",
     notes: null,
     previousDraft: null,
   });
