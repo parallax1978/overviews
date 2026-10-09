@@ -9,11 +9,14 @@
  * for the report and $0.25 for the draft.
  */
 import { existsSync } from "node:fs";
+import { register } from "node:module";
 import path from "node:path";
 
 const root = path.resolve(path.dirname(new URL(import.meta.url).pathname), "..");
 const envFile = path.join(root, ".env.local");
 if (existsSync(envFile)) process.loadEnvFile(envFile);
+// lib/analyze.ts pulls in the admin Supabase client, which is marked server-only.
+register("./_server-only-shim.mjs", import.meta.url);
 
 async function main() {
   const trackerId = process.argv[2];
