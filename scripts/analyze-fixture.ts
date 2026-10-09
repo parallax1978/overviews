@@ -25,7 +25,9 @@ async function main() {
   if (!overview.hasOverview) throw new Error("Fixture has no AI Overview");
 
   const keyword = String(raw?.tasks?.[0]?.data?.keyword ?? "best form builder");
-  console.log(`Analyzing "${keyword}" from ${path.relative(root, fixture)} (1 day, ${overview.references.length} sources)`);
+  console.log(
+    `Analyzing "${keyword}" from ${path.relative(root, fixture)} (1 day, 1 sample, ${overview.references.length} sources)`,
+  );
 
   const started = Date.now();
   const analysis = await analyzeOverviews(
@@ -38,6 +40,7 @@ async function main() {
       snapshots: [
         {
           day_number: 1,
+          sample: 1,
           captured_at: new Date().toISOString(),
           has_overview: true,
           overview_text: overview.text,
@@ -55,8 +58,14 @@ async function main() {
   console.log(
     `Analysis done in ${analysisSeconds}s. model=${analysis.model} usage=${JSON.stringify(analysis.usage)}`,
   );
+  const { patterns, citation_research: research } = analysis;
   console.log(
-    `  claims=${analysis.patterns.recurring_claims.length} entities=${analysis.patterns.repeated_entities.length} sources=${analysis.patterns.frequent_sources.length} research=${analysis.citation_research.length} fetched=${analysis.citation_research.filter((c) => c.fetched).length} sections=${analysis.blueprint.sections.length}`,
+    `  claims=${patterns.recurring_claims.length} entities=${patterns.repeated_entities.length} sources=${patterns.frequent_sources.length} research=${research.length} fetched=${research.filter((c) => c.fetched).length} sections=${analysis.blueprint.sections.length}`,
+  );
+  // With one sample every count should be 1; anything else means Claude guessed.
+  console.log(
+    `  samples_present: claims=[${patterns.recurring_claims.map((c) => c.samples_present).join(",")}] entities=[${patterns.repeated_entities.map((e) => e.samples_present).join(",")}]` +
+      ` samples_cited: sources=[${patterns.frequent_sources.map((s) => s.samples_cited).join(",")}] research=[${research.map((c) => c.samples_cited).join(",")}]`,
   );
   console.log(`  summary_md words=${analysis.summary_md.split(/\s+/).length}`);
 

@@ -9,22 +9,29 @@ import { pluralize } from "@/lib/utils";
 
 /** Numbers the dashboard derives from a tracker's snapshots. */
 export interface TrackerStats {
-  /** The most recent snapshot, or null when nothing has been captured yet. */
-  latest: { dayNumber: number; hasOverview: boolean; capturedAt: string } | null;
-  /** Distinct domains Google has cited across all captured days. */
+  /** The most recent captured day, or null when nothing has been captured yet. */
+  latest: {
+    dayNumber: number;
+    /** Samples taken that day. */
+    samples: number;
+    /** Samples that day in which an AI Overview appeared. */
+    samplesWithOverview: number;
+    capturedAt: string;
+  } | null;
+  /** Distinct domains Google has cited across all samples. */
   sourcesSeen: number;
-  /** Days on which an AI Overview appeared. */
-  daysWithOverview: number;
-  /** Days captured so far. */
-  daysCaptured: number;
+  /** Samples in which an AI Overview appeared, across all days. */
+  samplesWithOverview: number;
+  /** Samples captured so far, across all days. */
+  samplesCaptured: number;
 }
 
 /** Stats for a tracker that has no snapshots yet. */
 export const EMPTY_TRACKER_STATS: TrackerStats = {
   latest: null,
   sourcesSeen: 0,
-  daysWithOverview: 0,
-  daysCaptured: 0,
+  samplesWithOverview: 0,
+  samplesCaptured: 0,
 };
 
 const ERROR_PREVIEW_LENGTH = 90;
@@ -109,25 +116,27 @@ function TrackerFacts({ stats }: { stats: TrackerStats }) {
     );
   }
 
+  const todayHasOverview = stats.latest.samplesWithOverview > 0;
+
   return (
     <dl className="grid w-full grid-cols-3 gap-3 text-sm sm:flex sm:w-auto sm:gap-6">
       <Fact
         label="AI Overview today"
         value={
           <span className="inline-flex items-center gap-1">
-            {stats.latest.hasOverview ? (
+            {todayHasOverview ? (
               <CircleCheck className="h-4 w-4 text-good" aria-hidden="true" />
             ) : (
               <X className="h-4 w-4 text-ink-soft" aria-hidden="true" />
             )}
-            {stats.latest.hasOverview ? "Yes" : "No"}
+            in {stats.latest.samplesWithOverview} of {pluralize(stats.latest.samples, "sample")}
           </span>
         }
       />
       <Fact label="Sources seen" value={pluralize(stats.sourcesSeen, "source")} />
       <Fact
-        label="Seen on"
-        value={`${stats.daysWithOverview} of ${pluralize(stats.daysCaptured, "day")}`}
+        label="Seen in"
+        value={`${stats.samplesWithOverview} of ${pluralize(stats.samplesCaptured, "sample")}`}
       />
     </dl>
   );

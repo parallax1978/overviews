@@ -7,13 +7,15 @@ import { Eyebrow } from "@/components/ui/eyebrow";
 import { requireUser } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import type { OverviewReference, Tracker } from "@/lib/types";
+import { domainFromUrl } from "@/lib/utils";
 
 export const metadata: Metadata = { title: "Your keywords" };
 
-/** The snapshot columns the dashboard needs. */
+/** The snapshot columns the dashboard needs. One row is one sample of one day. */
 interface SnapshotRow {
   tracker_id: string;
   day_number: number;
+  sample: number;
   has_overview: boolean;
   references: OverviewReference[] | null;
   captured_at: string;
@@ -35,7 +37,7 @@ export default async function DashboardPage() {
   if (trackers.length > 0) {
     const { data: snapshotRows, error: snapshotsError } = await supabase
       .from("snapshots")
-      .select("tracker_id, day_number, has_overview, references, captured_at")
+      .select("tracker_id, day_number, sample, has_overview, references, captured_at")
       .in(
         "tracker_id",
         trackers.map((t) => t.id),
@@ -86,33 +88,52 @@ export default async function DashboardPage() {
   );
 }
 
-/** Folds every snapshot row into per-tracker numbers: latest day, distinct cited domains, days with an overview. */
+/**
+ * Folds every snapshot row (one per sample) into per-tracker numbers: the latest
+ * day's samples, distinct cited domains, and samples with an overview.
+ */
 function summarizeSnapshots(rows: SnapshotRow[]): Map<string, TrackerStats> {
-  const byTracker = new Map<string, { stats: TrackerStats; domains: Set<string> }>();
-
+  const byTracker = new Map<string, SnapshotRow[]>();
   for (const row of rows) {
-    let entry = byTracker.get(row.tracker_id);
-    if (!entry) {
-      entry = { stats: { ...EMPTY_TRACKER_STATS }, domains: new Set<string>() };
-      byTracker.set(row.tracker_id, entry);
-    }
-    entry.stats.daysCaptured += 1;
-    if (row.has_overview) entry.stats.daysWithOverview += 1;
-    for (const ref of row.references ?? []) {
-      if (ref?.domain) entry.domains.add(ref.domain.toLowerCase());
-    }
-    if (!entry.stats.latest || row.day_number > entry.stats.latest.dayNumber) {
-      entry.stats.latest = {
-        dayNumber: row.day_number,
-        hasOverview: row.has_overview,
-        capturedAt: row.captured_at,
-      };
-    }
+    const list = byTracker.get(row.tracker_id);
+    if (list) list.push(row);
+    else byTracker.set(row.tracker_id, [row]);
   }
 
   const result = new Map<string, TrackerStats>();
-  for (const [trackerId, entry] of byTracker) {
-    result.set(trackerId, { ...entry.stats, sourcesSeen: entry.domains.size });
+  for (const [trackerId, trackerRows] of byTracker) {
+    const domains = new Set<string>();
+    let samplesWithOverview = 0;
+    let latestDay = -Infinity;
+    for (const row of trackerRows) {
+      if (row.has_overview) samplesWithOverview += 1;
+      if (row.day_number > latestDay) latestDay = row.day_number;
+      for (const ref of row.references ?? []) {
+        const domain = ref?.domain || (ref?.url ? domainFromUrl(ref.url) : "");
+        if (domain) domains.add(domain.toLowerCase().replace(/^www\./, ""));
+      }
+    }
+
+    const latestRows = trackerRows.filter((row) => row.day_number === latestDay);
+    const latest =
+      latestRows.length > 0
+        ? {
+            dayNumber: latestDay,
+            samples: latestRows.length,
+            samplesWithOverview: latestRows.filter((row) => row.has_overview).length,
+            capturedAt: latestRows.reduce(
+              (min, row) => (row.captured_at < min ? row.captured_at : min),
+              latestRows[0].captured_at,
+            ),
+          }
+        : null;
+
+    result.set(trackerId, {
+      latest,
+      sourcesSeen: domains.size,
+      samplesWithOverview,
+      samplesCaptured: trackerRows.length,
+    });
   }
   return result;
 }

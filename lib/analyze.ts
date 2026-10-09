@@ -43,7 +43,8 @@ async function loadSnapshots(admin: Admin, trackerId: string): Promise<Snapshot[
     .from("snapshots")
     .select("*")
     .eq("tracker_id", trackerId)
-    .order("day_number", { ascending: true });
+    .order("day_number", { ascending: true })
+    .order("sample", { ascending: true });
   if (error) throw new Error(error.message);
   return (data ?? []) as Snapshot[];
 }
@@ -59,6 +60,7 @@ async function loadLatestAnalysis(admin: Admin, trackerId: string, onlyDone = fa
 function toAnalysisSnapshot(s: Snapshot): AnalysisSnapshotInput {
   return {
     day_number: s.day_number,
+    sample: s.sample,
     captured_at: s.captured_at,
     has_overview: s.has_overview,
     overview_text: s.overview_text,
@@ -66,6 +68,11 @@ function toAnalysisSnapshot(s: Snapshot): AnalysisSnapshotInput {
     references: s.references ?? [],
     inline_links: s.inline_links ?? [],
   };
+}
+
+/** Number of distinct captured days among the snapshots (each day holds several samples). */
+function countDays(snapshots: Pick<Snapshot, "day_number">[]): number {
+  return new Set(snapshots.map((s) => s.day_number)).size;
 }
 
 /** Status for a tracker that is not being analyzed and has no usable prior status. */
@@ -145,9 +152,20 @@ export async function runAnalysis(trackerId: string): Promise<Analysis> {
   if (claimError) throw new Error(claimError.message);
   if (!claimed?.length) throw new AnalysisInProgressError();
 
+  // How much data the report is built from, written up front so the progress UI can show it.
+  const samplesTotal = snapshots.length;
+  const daysTotal = countDays(snapshots);
+
   const { data: inserted, error: insertError } = await admin
     .from("analyses")
-    .insert({ tracker_id: trackerId, status: "running", step: "Starting", model: CLAUDE_MODEL })
+    .insert({
+      tracker_id: trackerId,
+      status: "running",
+      step: "Starting",
+      model: CLAUDE_MODEL,
+      samples_total: samplesTotal,
+      days_total: daysTotal,
+    })
     .select("*")
     .single();
   if (insertError || !inserted) {
@@ -181,6 +199,8 @@ export async function runAnalysis(trackerId: string): Promise<Analysis> {
         citation_research: result.citation_research,
         blueprint: result.blueprint,
         summary_md: result.summary_md,
+        samples_total: samplesTotal,
+        days_total: daysTotal,
         usage: result.usage,
         model: result.model,
         status: "done",

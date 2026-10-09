@@ -1,23 +1,33 @@
 /**
- * Captures one AI Overview snapshot for a tracker and runs the daily batch.
+ * Captures one day of AI Overview samples for a tracker and runs the daily batch.
+ * Google writes a different overview for every request, so a day is
+ * SAMPLES_PER_DAY requests fired in parallel and stored as one snapshot row each.
  * Uses the service-role client: callers must have verified ownership first
  * (server actions) or be the secret-protected cron.
  */
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { regenerateDraft, runAnalysis } from "@/lib/analyze";
 import { logApiCall } from "@/lib/api-log";
-import { DATAFORSEO_ENDPOINT, DataForSeoError, fetchSerpWithAiOverview } from "@/lib/dataforseo";
-import { computeDiff } from "@/lib/diff";
-import { normalizeAiOverview, type NormalizedOverview } from "@/lib/overview";
+import {
+  type CaptureResult,
+  DATAFORSEO_ENDPOINT,
+  DataForSeoError,
+  fetchSerpWithAiOverview,
+} from "@/lib/dataforseo";
+import { type Comparable, computeDayDiff } from "@/lib/diff";
+import { normalizeAiOverview } from "@/lib/overview";
 import { isCaptureDue, nextCaptureAt } from "@/lib/schedule";
 import { createAdminClient } from "@/lib/supabase/admin";
-import type { Snapshot, Tracker, TrackerStatus } from "@/lib/types";
+import { SAMPLES_PER_DAY, type Snapshot, type Tracker, type TrackerStatus } from "@/lib/types";
 import { domainMatches } from "@/lib/utils";
 
 const UNIQUE_VIOLATION = "23505";
 const DEFAULT_LIMIT = 200;
 const DEFAULT_CONCURRENCY = 4;
-/** Stop starting new captures after this long so the 300s function returns cleanly. */
+/**
+ * Stop starting new captures after this long so the 300s function returns cleanly.
+ * A tracker takes about 20s: its samples run in parallel.
+ */
 const CAPTURE_BUDGET_MS = 240_000;
 /** Only start a report (about 3 minutes) while this much of the function's time is still unused. */
 const ANALYSIS_START_BUDGET_MS = 60_000;
@@ -35,60 +45,62 @@ export interface CaptureRunSummary {
 
 export { isCaptureDue, nextCaptureAt };
 
+/** The parts of a stored sample the day diff needs (no raw SERP payload). */
+type SampleText = Pick<Snapshot, "sample" | "overview_text" | "references">;
+
 /**
- * Fetches today's SERP, stores the snapshot for `dayNumber` (default: the next
- * day) and advances the tracker. Logs the API call either way and rethrows on failure.
+ * Takes the samples for `dayNumber` (default: the next day), stores one
+ * snapshot row per sample, writes the day's diff on its first sample and
+ * advances the tracker once. Samples the day already has (an overlapping cron
+ * run, a retry after a partial failure) are kept; only the missing ones are
+ * fetched. Logs every API call. Throws when the day ends up with no sample at
+ * all, after marking the tracker as before.
  */
 export async function captureSnapshot(
   trackerId: string,
   opts?: { dayNumber?: number },
-): Promise<{ snapshot: Snapshot; tracker: Tracker }> {
+): Promise<{ snapshots: Snapshot[]; tracker: Tracker }> {
   const admin = createAdminClient();
   const tracker = await loadTracker(admin, trackerId);
   const dayNumber = opts?.dayNumber ?? tracker.day_count + 1;
-  const startedAt = Date.now();
-  let apiLogged = false;
 
-  try {
-    const result = await fetchSerpWithAiOverview({
-      keyword: tracker.keyword,
-      location_code: tracker.location_code,
-      language_code: tracker.language_code,
-      device: tracker.device,
-    });
-    apiLogged = true;
-    await logApiCall(admin, {
-      tracker_id: tracker.id,
-      provider: "dataforseo",
-      endpoint: DATAFORSEO_ENDPOINT,
-      status: 200,
-      cost_usd: result.cost,
-      duration_ms: Date.now() - startedAt,
-    });
-    return await storeSnapshot(admin, tracker, dayNumber, result);
-  } catch (err) {
-    const message = shortErrorMessage(err);
-    if (!apiLogged) {
-      await logApiCall(admin, {
-        tracker_id: tracker.id,
-        provider: "dataforseo",
-        endpoint: DATAFORSEO_ENDPOINT,
-        status: err instanceof DataForSeoError && err.statusCode > 0 ? err.statusCode : null,
-        cost_usd: 0,
-        duration_ms: Date.now() - startedAt,
-        error: message,
-      });
-    }
-    await markCaptureFailed(admin, tracker.id, dayNumber, message);
+  const snapshots = await loadDaySnapshots(admin, tracker.id, dayNumber);
+  const have = new Set(snapshots.map((s) => s.sample));
+  const missing = Array.from({ length: SAMPLES_PER_DAY }, (_, i) => i + 1).filter((s) => !have.has(s));
+
+  const settled = await Promise.allSettled(
+    missing.map((sample) => captureSample(admin, tracker, dayNumber, sample)),
+  );
+  let firstError: unknown = null;
+  for (const outcome of settled) {
+    if (outcome.status === "fulfilled") snapshots.push(outcome.value);
+    else if (firstError === null) firstError = outcome.reason;
+  }
+
+  if (snapshots.length === 0) {
+    const err = firstError ?? new Error("No sample was captured");
+    await markCaptureFailed(admin, tracker.id, dayNumber, shortErrorMessage(err));
     throw err;
   }
+  if (firstError !== null) {
+    console.warn(
+      `capture ${tracker.id} day ${dayNumber}: kept ${snapshots.length} of ${SAMPLES_PER_DAY} samples;`,
+      shortErrorMessage(firstError),
+    );
+  }
+  snapshots.sort((a, b) => a.sample - b.sample);
+
+  await storeDayDiff(admin, tracker.id, dayNumber, snapshots);
+  const advanced = await advanceTracker(admin, tracker, dayNumber, snapshots);
+  return { snapshots, tracker: advanced };
 }
 
 /**
- * Captures every tracker that is due today, four at a time, then builds the
- * report for trackers that just reached their day target (one at a time,
- * while the function still has time). Reports it could not start are built
- * when the user next opens the keyword page.
+ * Captures every tracker that is due today, four at a time (each tracker's
+ * samples run in parallel, about 20s per tracker), then builds the report for
+ * trackers that just reached their day target (one at a time, while the
+ * function still has time). Reports it could not start are built when the
+ * user next opens the keyword page.
  */
 export async function runDueCaptures(opts?: {
   now?: Date;
@@ -173,16 +185,51 @@ async function loadTracker(admin: SupabaseClient, trackerId: string): Promise<Tr
   return data as Tracker;
 }
 
-async function loadSnapshot(
+/** Every sample stored for a day, lowest sample first. */
+async function loadDaySnapshots(
   admin: SupabaseClient,
   trackerId: string,
   dayNumber: number,
+): Promise<Snapshot[]> {
+  const { data, error } = await admin
+    .from("snapshots")
+    .select("*")
+    .eq("tracker_id", trackerId)
+    .eq("day_number", dayNumber)
+    .order("sample", { ascending: true });
+  if (error) throw new Error(`Could not load snapshots: ${error.message}`);
+  return (data ?? []) as Snapshot[];
+}
+
+/** A day's samples without their raw SERP payloads, lowest sample first. */
+async function loadDayTexts(
+  admin: SupabaseClient,
+  trackerId: string,
+  dayNumber: number,
+): Promise<SampleText[]> {
+  const { data, error } = await admin
+    .from("snapshots")
+    .select("sample, overview_text, references")
+    .eq("tracker_id", trackerId)
+    .eq("day_number", dayNumber)
+    .order("sample", { ascending: true });
+  if (error) throw new Error(`Could not load snapshots: ${error.message}`);
+  return (data ?? []) as SampleText[];
+}
+
+/** One stored sample of a day, or null. */
+async function loadSample(
+  admin: SupabaseClient,
+  trackerId: string,
+  dayNumber: number,
+  sample: number,
 ): Promise<Snapshot | null> {
   const { data, error } = await admin
     .from("snapshots")
     .select("*")
     .eq("tracker_id", trackerId)
     .eq("day_number", dayNumber)
+    .eq("sample", sample)
     .maybeSingle();
   if (error) throw new Error(`Could not load snapshot: ${error.message}`);
   return (data as Snapshot | null) ?? null;
@@ -207,24 +254,61 @@ async function loadPendingReports(admin: SupabaseClient, limit: number): Promise
     .map((r) => r.id);
 }
 
-async function storeSnapshot(
+/** One DataForSEO request for sample `sample` of the day, logged either way, stored on success. */
+async function captureSample(
   admin: SupabaseClient,
   tracker: Tracker,
   dayNumber: number,
-  result: Awaited<ReturnType<typeof fetchSerpWithAiOverview>>,
-): Promise<{ snapshot: Snapshot; tracker: Tracker }> {
+  sample: number,
+): Promise<Snapshot> {
+  const startedAt = Date.now();
+  let result: CaptureResult;
+  try {
+    result = await fetchSerpWithAiOverview({
+      keyword: tracker.keyword,
+      location_code: tracker.location_code,
+      language_code: tracker.language_code,
+      device: tracker.device,
+    });
+  } catch (err) {
+    await logApiCall(admin, {
+      tracker_id: tracker.id,
+      provider: "dataforseo",
+      endpoint: DATAFORSEO_ENDPOINT,
+      status: err instanceof DataForSeoError && err.statusCode > 0 ? err.statusCode : null,
+      cost_usd: 0,
+      duration_ms: Date.now() - startedAt,
+      error: shortErrorMessage(err),
+    });
+    throw err;
+  }
+  await logApiCall(admin, {
+    tracker_id: tracker.id,
+    provider: "dataforseo",
+    endpoint: DATAFORSEO_ENDPOINT,
+    status: 200,
+    cost_usd: result.cost,
+    duration_ms: Date.now() - startedAt,
+  });
+  return storeSample(admin, tracker, dayNumber, sample, result);
+}
+
+/** Inserts the sample's snapshot row. The day diff is added later, once every sample is in. */
+async function storeSample(
+  admin: SupabaseClient,
+  tracker: Tracker,
+  dayNumber: number,
+  sample: number,
+  result: CaptureResult,
+): Promise<Snapshot> {
   const overview = normalizeAiOverview(result.aiOverviewItem);
-  const previous = dayNumber > 1 ? await loadSnapshot(admin, tracker.id, dayNumber - 1) : null;
-  const diff = computeDiff(
-    previous ? { text: previous.overview_text, references: previous.references ?? [] } : null,
-    { text: overview.text, references: overview.references },
-  );
 
   const { data: inserted, error: insertError } = await admin
     .from("snapshots")
     .insert({
       tracker_id: tracker.id,
       day_number: dayNumber,
+      sample,
       captured_at: new Date().toISOString(),
       has_overview: overview.hasOverview,
       overview_text: overview.text,
@@ -233,7 +317,7 @@ async function storeSnapshot(
       inline_links: overview.inlineLinks,
       raw: result.raw,
       content_hash: overview.contentHash,
-      diff,
+      diff: null,
       cost_usd: result.cost,
     })
     .select("*")
@@ -241,27 +325,59 @@ async function storeSnapshot(
 
   if (insertError) {
     if (insertError.code === UNIQUE_VIOLATION) {
-      // Another run already stored this day (overlapping cron, or a retry after a
-      // partial failure): keep that row, but still move the tracker forward.
-      const existing = await loadSnapshot(admin, tracker.id, dayNumber);
-      if (existing) {
-        const advanced = await advanceTracker(admin, tracker, dayNumber, overview);
-        return { snapshot: existing, tracker: advanced };
-      }
+      // Another run already stored this sample (overlapping cron, or a retry
+      // racing the first attempt): keep that row.
+      const existing = await loadSample(admin, tracker.id, dayNumber, sample);
+      if (existing) return existing;
     }
     throw new Error(`Could not save snapshot: ${insertError.message}`);
   }
-
-  const advanced = await advanceTracker(admin, tracker, dayNumber, overview);
-  return { snapshot: inserted as Snapshot, tracker: advanced };
+  return inserted as Snapshot;
 }
 
-/** Day count, next capture time, status transitions and the "you were cited" mark after a capture. */
+/**
+ * Compares the day's samples with the previous day's and stores the result on
+ * the day's first sample. Every other sample keeps diff = null, so the
+ * Timeline reads one diff per day.
+ */
+async function storeDayDiff(
+  admin: SupabaseClient,
+  trackerId: string,
+  dayNumber: number,
+  snapshots: Snapshot[],
+): Promise<void> {
+  const previous = dayNumber > 1 ? await loadDayTexts(admin, trackerId, dayNumber - 1) : [];
+  const diff = computeDayDiff(previous.length ? previous.map(comparable) : null, snapshots.map(comparable));
+
+  const [first, ...rest] = snapshots;
+  const { error } = await admin.from("snapshots").update({ diff }).eq("id", first.id);
+  if (error) throw new Error(`Could not save day diff: ${error.message}`);
+  first.diff = diff;
+
+  // A sample that was the day's first on an earlier, partial run still carries that run's diff.
+  const stale = rest.filter((s) => s.diff !== null);
+  if (stale.length === 0) return;
+  const { error: clearError } = await admin
+    .from("snapshots")
+    .update({ diff: null })
+    .in(
+      "id",
+      stale.map((s) => s.id),
+    );
+  if (clearError) console.error("stale day diff clear failed", clearError.message);
+  else for (const s of stale) s.diff = null;
+}
+
+function comparable(sample: Pick<Snapshot, "overview_text" | "references">): Comparable {
+  return { text: sample.overview_text, references: sample.references ?? [] };
+}
+
+/** Day count, next capture time, status transitions and the "you were cited" mark after a day's capture. */
 async function advanceTracker(
   admin: SupabaseClient,
   tracker: Tracker,
   dayNumber: number,
-  overview: NormalizedOverview,
+  snapshots: Snapshot[],
 ): Promise<Tracker> {
   const dayCount = Math.max(tracker.day_count, dayNumber);
   let status: TrackerStatus = tracker.status === "error" ? "tracking" : tracker.status;
@@ -275,7 +391,8 @@ async function advanceTracker(
   };
   const target = tracker.target_domain;
   if (tracker.cited_on_day == null && target) {
-    const cited = overview.references.some((ref) => domainMatches(ref.domain, target));
+    // Any sample counts: Google cited the site in at least one of today's overviews.
+    const cited = snapshots.some((s) => (s.references ?? []).some((ref) => domainMatches(ref.domain, target)));
     if (cited) update.cited_on_day = dayNumber;
   }
 

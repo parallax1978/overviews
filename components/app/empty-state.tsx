@@ -5,7 +5,7 @@ import { NumberBadge } from "@/components/ui/number-badge";
 
 const STEPS = [
   "Pick a Google search that already shows an AI Overview.",
-  "We capture that AI Overview every day for 7 days and show you what Google keeps citing.",
+  "We capture that AI Overview three times a day for 7 days and show you what Google keeps citing.",
   "Then we write you a page built to get cited, and watch for your site to show up.",
 ];
 

@@ -10,10 +10,16 @@ import type {
   OverviewReference,
   PageBlueprint,
 } from "@/lib/types";
+import { pluralize } from "@/lib/utils";
 
-/** One captured day, as handed to the analysis prompt. */
+/**
+ * One captured sample (one request on one day), as handed to the analysis
+ * prompt. Google answers every request differently, so a day holds several.
+ */
 export interface AnalysisSnapshotInput {
   day_number: number;
+  /** 1-based index of this sample within its day. */
+  sample: number;
   captured_at: string;
   has_overview: boolean;
   overview_text: string | null;
@@ -32,11 +38,14 @@ export interface AnalysisInput {
   userEdge: string | null;
 }
 
-/** A cited URL ranked by how many days Google cited it. */
+/** A cited URL ranked by how many samples (then how many days) Google cited it in. */
 export interface CandidateUrl {
   url: string;
   domain: string;
   title: string | null;
+  /** Distinct samples, across all days, that cited the URL. */
+  samples_cited: number;
+  /** Distinct days on which at least one sample cited the URL. */
   days_cited: number;
 }
 
@@ -62,27 +71,28 @@ export const ANALYSIS_SYSTEM_PROMPT = `You are a senior SEO analyst. You apply J
 5. Build a better page around the findings, and add something new worth citing.
 6. Publish, then keep tracking.
 
-Steps 1 and 2 are done. The user message contains every captured day. Your job is steps 3 and 4, plus the blueprint for step 5.
+Steps 1 and 2 are done. Google generates a different AI Overview for every request, so each captured day holds several samples: separate requests for the same search, made minutes apart, often with different wording and different citations. The user message contains every sample of every day, grouped by day. Your job is steps 3 and 4, plus the blueprint for step 5.
 
 ## How to work
 
-- Read every day before you write anything. Count precisely from the data: a claim present on 4 of 7 days has days_present 4; a source cited on 3 days has days_cited 3. "Days" means distinct captured days, never the number of mentions. Never guess a count.
-- A day marked "[no AI Overview appeared]" is a day with no claims and no citations. It still counts toward the total number of days.
-- Then study the cited pages. The user message lists "Candidate pages to fetch", ranked by days cited. Fetch them with the web_fetch tool, several at once if you like, up to the tool's limit. For a page you could read, set fetched to true and describe the real page. If a fetch fails or returns nothing useful, set fetched to false and work only from the title and snippet Google showed; say so in the structure field ("not fetched; based on Google's snippet"). Never describe a page you did not read as if you had read it.
+- Read every sample before you write anything. Count precisely from the data. Never guess a count.
+- Two kinds of count appear in the output. samples_present and samples_cited are the number of distinct samples, across all days, in which the claim, entity or source appeared: a claim found in 2 of day 1's samples and 1 of day 2's has samples_present 3. days_present and days_cited are the number of distinct days on which it appeared in at least one sample: that same claim has days_present 2. A sample counts once, however many times it mentions the thing. The user message states how many samples and days were captured; no count can exceed those totals.
+- A sample marked "[no AI Overview appeared]" is a sample with no claims and no citations. It still counts toward the total number of samples.
+- Then study the cited pages. The user message lists "Candidate pages to fetch", ranked by samples cited. Fetch them with the web_fetch tool, several at once if you like, up to the tool's limit. For a page you could read, set fetched to true and describe the real page. If a fetch fails or returns nothing useful, set fetched to false and work only from the title and snippet Google showed; say so in the structure field ("not fetched; based on Google's snippet"). Never describe a page you did not read as if you had read it.
 - Finish with one JSON object that follows the output schema exactly. No prose before or after it.
 
 ## Output fields
 
 patterns
-- recurring_claims: statements the AI Overview makes on more than one day. claim is the statement in your words, days_present the number of days it appeared, example a short verbatim quote from one day.
-- repeated_entities: brands, products, people, places, tools or concepts named on more than one day. role is what they are to the answer ("recommended option", "the thing being compared", "a cause", "a step").
-- formats: opening describes how the overview starts (a direct definition, a list of options, a verdict). structure describes the shape of the whole answer. uses_table and uses_list are true if any day used one. typical_length_words is the average word count of the days that had an overview, rounded to a whole number.
-- frequent_sources: one entry per cited URL that appeared on at least one day, highest days_cited first. cited_for is what Google used it for, in a few words.
-- differences: one entry per day that differed from the day before. what_changed is a plain description (a new citation, a dropped claim, a reordered list, a day with no overview). Day 1 has nothing to compare against. Leave out days that were identical to the previous day.
-- stable_core: one paragraph, in plain words, containing what Google included on every day that had an overview. This is the answer a page must give.
+- recurring_claims: statements the AI Overview makes in more than one sample. claim is the statement in your words, samples_present and days_present the counts defined above, example a short verbatim quote from one sample.
+- repeated_entities: brands, products, people, places, tools or concepts named in more than one sample. role is what they are to the answer ("recommended option", "the thing being compared", "a cause", "a step").
+- formats: opening describes how the overview usually starts (a direct definition, a list of options, a verdict). structure describes the shape of the whole answer. uses_table and uses_list are true if any sample used one. typical_length_words is the average word count of the samples that had an overview, rounded to a whole number.
+- frequent_sources: one entry per cited URL that appeared in at least one sample, highest samples_cited first. cited_for is what Google used it for, in a few words.
+- differences: one entry per day whose samples, taken together, differed from the previous day's samples: a source cited on one day and in none of the next day's samples, a claim that appeared or vanished across the day, a reordered list, a day with no overview in any sample. Ordinary sample-to-sample variation within one day is not a difference. what_changed is a plain description. Day 1 has nothing to compare against. Leave out days that matched the previous day.
+- stable_core: one paragraph, in plain words, containing what Google included in every sample, or nearly every sample, that had an overview. This is the answer a page must give.
 
 citation_research: one entry per candidate page, in the same order as the candidate list.
-- days_cited: copy from the candidate list.
+- samples_cited and days_cited: copy from the candidate list.
 - fetched: true only if web_fetch returned the page.
 - answers_how_fast: where the direct answer first appears ("first sentence", "paragraph 2, after a short intro", "only in a table halfway down", "never directly").
 - topics_covered and entities_covered: what the page actually covers and names.
@@ -94,7 +104,7 @@ citation_research: one entry per candidate page, in the same order as the candid
 blueprint: what a better page must be.
 - page_goal: one sentence.
 - target_question: the exact question the searcher is asking, written as a question.
-- must_cover: topics the page must include, each with why (which days and sources show it matters).
+- must_cover: topics the page must include, each with why (how many samples, and which sources, show it matters).
 - must_mention: the entities the page must name, taken from repeated_entities and the cited pages.
 - recommended_format: the order of formats, for example "direct answer, then comparison table, then one section per option, then FAQ".
 - opening_answer: the one-paragraph direct answer the page should open with. Write it in full so it is ready to use. Base it on stable_core, not on invention.
@@ -106,7 +116,7 @@ summary_md: a report in plain English for someone who is not an SEO expert. Unde
 ## Who Google keeps citing
 ## What the winning pages do
 ## What your page needs
-Short sentences. Use real numbers (days, counts) and real source names. No jargon: say "the sources Google cites" rather than "SERP features", and "the answer" rather than "the snippet". If the user's website was given, say whether it was cited on any day. End "What your page needs" with the single most important thing to do.`;
+Short sentences. Quote every count as "in X of S samples", where S is the total number of samples captured. Add the day count only when it says something the sample count does not (for example a source cited in 6 samples that all fell on one day). Say once, in one short sentence, that Google gives a slightly different answer each time it is asked, which is why the report counts samples. Rank "Who Google keeps citing" by samples_cited, most cited first, and use real source names. No jargon: say "the sources Google cites" rather than "SERP features", and "the answer" rather than "the snippet". If the user's website was given, say whether it was cited in any sample. End "What your page needs" with the single most important thing to do.`;
 
 export const DRAFT_SYSTEM_PROMPT = `You are an expert writer. You produce the page described by a blueprint so it can earn a citation in Google's AI Overview for the target search.
 
@@ -154,8 +164,8 @@ function renderInlineLinks(links: OverviewInlineLink[]): string {
   return `Inline links:\n${lines.join("\n")}`;
 }
 
-function renderDay(snap: AnalysisSnapshotInput): string {
-  const header = `## Day ${snap.day_number} (${isoDay(snap.captured_at)})`;
+function renderSample(snap: AnalysisSnapshotInput, samplesInDay: number): string {
+  const header = `### Sample ${snap.sample} of ${samplesInDay}`;
   if (!snap.has_overview) return `${header}\n[no AI Overview appeared]`;
   const body =
     snap.overview_markdown?.trim() || snap.overview_text?.trim() || "(overview text unavailable)";
@@ -169,27 +179,49 @@ function renderDay(snap: AnalysisSnapshotInput): string {
   ].join("\n");
 }
 
-/** Render the user message for the analysis call: every day, then the ranked pages to fetch. */
+/** Snapshots grouped by day, days ascending, samples ascending within each day. */
+function groupByDay(snapshots: AnalysisSnapshotInput[]): AnalysisSnapshotInput[][] {
+  const byDay = new Map<number, AnalysisSnapshotInput[]>();
+  for (const snap of snapshots) {
+    const group = byDay.get(snap.day_number);
+    if (group) group.push(snap);
+    else byDay.set(snap.day_number, [snap]);
+  }
+  return [...byDay.entries()]
+    .sort(([a], [b]) => a - b)
+    .map(([, group]) => [...group].sort((a, b) => a.sample - b.sample));
+}
+
+function renderDay(samples: AnalysisSnapshotInput[]): string {
+  const first = samples[0];
+  // Normally the day's sample count; if a sample is missing, the highest index keeps "k of M" honest.
+  const samplesInDay = Math.max(samples.length, ...samples.map((s) => s.sample));
+  const header = `## Day ${first.day_number} (${isoDay(first.captured_at)})`;
+  return [header, ...samples.map((s) => renderSample(s, samplesInDay))].join("\n\n");
+}
+
+/** Render the user message for the analysis call: every sample of every day, then the ranked pages to fetch. */
 export function buildAnalysisUserPrompt(input: AnalysisInput, candidateUrls: CandidateUrl[]): string {
-  const days = [...input.snapshots].sort((a, b) => a.day_number - b.day_number);
-  const total = days.length;
-  const withOverview = days.filter((d) => d.has_overview).length;
+  const days = groupByDay(input.snapshots);
+  const sampleCount = input.snapshots.length;
+  const dayCount = days.length;
+  const withOverview = input.snapshots.filter((s) => s.has_overview).length;
 
   const parts: string[] = [
     `Search: "${input.keyword}"`,
     `Country: ${input.locationName}`,
     `Language: ${input.languageCode}`,
-    `Days captured: ${total} (${withOverview} with an AI Overview)`,
+    `Samples captured: ${sampleCount} across ${pluralize(dayCount, "day")} (${pluralize(withOverview, "sample")} with an AI Overview)`,
     "",
     ...days.map((d) => `${renderDay(d)}\n`),
-    "## Candidate pages to fetch (ranked by days cited)",
+    "## Candidate pages to fetch (ranked by samples cited)",
   ];
 
   if (candidateUrls.length) {
     parts.push(
       ...candidateUrls.map(
         (c, i) =>
-          `${i + 1}. ${c.url} (${c.domain}; cited on ${c.days_cited} of ${total} days)` +
+          `${i + 1}. ${c.url} (${c.domain}) cited in ${c.samples_cited} of ${sampleCount} samples (${c.days_cited} of ${dayCount} days)` +
           (c.title ? ` — ${clean(c.title)}` : ""),
       ),
     );
@@ -209,6 +241,12 @@ export function buildAnalysisUserPrompt(input: AnalysisInput, candidateUrls: Can
 
 function yesNo(value: boolean): string {
   return value ? "yes" : "no";
+}
+
+/** "12 samples, 5 days". Reports built before sampling carry no sample counts, so those fall back to days alone. */
+function seenIn(samples: number | undefined, days: number): string {
+  const dayLabel = pluralize(days, "day");
+  return typeof samples === "number" ? `${pluralize(samples, "sample")}, ${dayLabel}` : dayLabel;
 }
 
 function renderBlueprint(b: PageBlueprint): string {
@@ -235,11 +273,13 @@ function renderPatterns(p: AnalysisPatterns): string {
     `Structure: ${p.formats.structure}`,
     `Uses a table: ${yesNo(p.formats.uses_table)}. Uses a list: ${yesNo(p.formats.uses_list)}. Typical length: ${p.formats.typical_length_words} words.`,
     "Recurring claims:",
-    ...p.recurring_claims.map((c) => `- ${c.claim} (${c.days_present} days)`),
+    ...p.recurring_claims.map((c) => `- ${c.claim} (${seenIn(c.samples_present, c.days_present)})`),
     "Repeated entities:",
-    ...p.repeated_entities.map((e) => `- ${e.entity} — ${e.role} (${e.days_present} days)`),
+    ...p.repeated_entities.map((e) => `- ${e.entity} — ${e.role} (${seenIn(e.samples_present, e.days_present)})`),
     "Most cited sources:",
-    ...p.frequent_sources.map((s) => `- ${s.domain} — ${s.url} (${s.days_cited} days) — ${s.cited_for}`),
+    ...p.frequent_sources.map(
+      (s) => `- ${s.domain} — ${s.url} (cited in ${seenIn(s.samples_cited, s.days_cited)}) — ${s.cited_for}`,
+    ),
   ].join("\n");
 }
 
@@ -250,7 +290,7 @@ function renderCitationResearch(items: CitationResearchItem[]): string {
       const data = c.data_included.length ? c.data_included.join("; ") : "none";
       const gaps = c.gaps.length ? c.gaps.join("; ") : "none found";
       return [
-        `- ${c.domain} (${c.fetched ? "read in full" : "snippet only"}; cited ${c.days_cited} days)`,
+        `- ${c.domain} (${c.fetched ? "read in full" : "snippet only"}; cited in ${seenIn(c.samples_cited, c.days_cited)})`,
         `  answers: ${c.answers_how_fast}`,
         `  structure: ${c.structure}`,
         `  data: ${data}`,

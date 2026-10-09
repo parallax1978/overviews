@@ -1,6 +1,10 @@
 /**
- * Day-over-day comparison of two AI Overview snapshots. Pure functions, used
+ * Day-over-day comparison of AI Overview snapshots. Pure functions, used
  * for display only (the Timeline tab highlights what changed since yesterday).
+ *
+ * A day has several samples (Google writes a different overview for every
+ * request), so a day is compared as the union of its samples' cited sources,
+ * and its text is the first sample that had an overview.
  */
 import type { OverviewReference, SnapshotDiff } from "@/lib/types";
 import { normalizeUrl } from "@/lib/overview";
@@ -9,17 +13,21 @@ const MAX_CHANGED_SENTENCES = 40;
 const MIN_SENTENCE_LENGTH = 20;
 const MIN_TOKEN_LENGTH = 2; // tokens must be longer than this
 
-interface Comparable {
+/** One sample's text and citations: the only snapshot fields the diff needs. */
+export interface Comparable {
   text: string | null;
   references: OverviewReference[];
 }
 
 /**
- * Compares today's snapshot with yesterday's. With no previous snapshot every
- * current citation counts as added and the text fields are left empty.
+ * Compares today's samples with yesterday's. Citations are the union across
+ * each day's samples; the text fields use the first sample of each day that
+ * has an overview, and a sentence only counts as new when no sample of the
+ * previous day had it. With no previous day every current citation counts as
+ * added and the text fields are left empty.
  */
-export function computeDiff(prev: Comparable | null, curr: Comparable): SnapshotDiff {
-  const currUrls = uniqueUrls(curr.references);
+export function computeDayDiff(prev: Comparable[] | null, curr: Comparable[]): SnapshotDiff {
+  const currUrls = uniqueUrls(curr);
   if (prev === null) {
     return {
       added_refs: [...currUrls.values()],
@@ -29,27 +37,41 @@ export function computeDiff(prev: Comparable | null, curr: Comparable): Snapshot
     };
   }
 
-  const prevUrls = uniqueUrls(prev.references);
+  const prevUrls = uniqueUrls(prev);
   const added = [...currUrls].filter(([key]) => !prevUrls.has(key)).map(([, url]) => url);
   const removed = [...prevUrls].filter(([key]) => !currUrls.has(key)).map(([, url]) => url);
+  const prevTexts = overviewTexts(prev);
+  const currText = overviewTexts(curr)[0] ?? null;
 
   return {
     added_refs: added,
     removed_refs: removed,
-    text_similarity: jaccardSimilarity(prev.text, curr.text),
-    changed_sentences: newSentences(prev.text, curr.text),
+    text_similarity: jaccardSimilarity(prevTexts[0] ?? null, currText),
+    changed_sentences: newSentences(prevTexts, currText),
   };
 }
 
-/** normalized url -> first url string seen with that key */
-function uniqueUrls(references: OverviewReference[]): Map<string, string> {
+/** One snapshot per day: the same comparison for callers written before sampling. */
+export function computeDiff(prev: Comparable | null, curr: Comparable): SnapshotDiff {
+  return computeDayDiff(prev ? [prev] : null, [curr]);
+}
+
+/** normalized url -> first url string seen with that key, across every sample of the day */
+function uniqueUrls(samples: Comparable[]): Map<string, string> {
   const map = new Map<string, string>();
-  for (const ref of Array.isArray(references) ? references : []) {
-    if (!ref || typeof ref.url !== "string" || !ref.url.trim()) continue;
-    const key = normalizeUrl(ref.url);
-    if (!map.has(key)) map.set(key, ref.url.trim());
+  for (const sample of samples) {
+    for (const ref of Array.isArray(sample.references) ? sample.references : []) {
+      if (!ref || typeof ref.url !== "string" || !ref.url.trim()) continue;
+      const key = normalizeUrl(ref.url);
+      if (!map.has(key)) map.set(key, ref.url.trim());
+    }
   }
   return map;
+}
+
+/** The texts of the samples that had an overview, in sample order. */
+function overviewTexts(samples: Comparable[]): string[] {
+  return samples.map((s) => s.text).filter((t): t is string => t !== null);
 }
 
 /** Lower-cased word tokens longer than two characters. */
@@ -79,10 +101,10 @@ export function splitSentences(text: string): string[] {
     .filter((s) => s.length > MIN_SENTENCE_LENGTH);
 }
 
-/** Sentences in `curr` that do not appear verbatim in `prev`, capped at 40. */
-function newSentences(prev: string | null, curr: string | null): string[] {
+/** Sentences in `curr` that do not appear verbatim in any of the `prev` texts, capped at 40. */
+function newSentences(prev: string[], curr: string | null): string[] {
   if (curr === null) return [];
-  const previous = new Set(prev === null ? [] : splitSentences(prev));
+  const previous = new Set(prev.flatMap(splitSentences));
   const seen = new Set<string>();
   const changed: string[] = [];
   for (const sentence of splitSentences(curr)) {

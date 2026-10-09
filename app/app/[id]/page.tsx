@@ -13,7 +13,7 @@ import { TrackerControls } from "@/components/app/tracker-controls";
 import { Chip } from "@/components/ui/chip";
 import { isReportStale, recoverStaleAnalysis } from "@/lib/analyze";
 import { ReportAutoStart } from "@/components/app/report-auto-start";
-import { aggregateCitations } from "@/lib/citations";
+import { aggregateCitations, countTotals } from "@/lib/citations";
 import { createClient } from "@/lib/supabase/server";
 import { LANGUAGES, type Analysis, type Draft, type Snapshot, type Tracker } from "@/lib/types";
 import { Tabs, resolveTab } from "./tabs";
@@ -68,7 +68,12 @@ export default async function TrackerPage({ params, searchParams }: PageProps) {
   }
 
   const [snapshotsRes, analysisRes, draftRes] = await Promise.all([
-    supabase.from("snapshots").select("*").eq("tracker_id", id).order("day_number", { ascending: true }),
+    supabase
+      .from("snapshots")
+      .select("*")
+      .eq("tracker_id", id)
+      .order("day_number", { ascending: true })
+      .order("sample", { ascending: true }),
     supabase
       .from("analyses")
       .select("*")
@@ -93,7 +98,9 @@ export default async function TrackerPage({ params, searchParams }: PageProps) {
   const draft = (draftRes.data as Draft | null) ?? null;
 
   const citationRows = aggregateCitations(snapshots);
-  const snapshotsWithOverview = snapshots.filter((s) => s.has_overview).length;
+  // Each day holds several samples (one snapshot row each); the report and the Citations tab count samples.
+  const totals = countTotals(snapshots);
+  const snapshotsWithOverview = totals.samplesWithOverview;
   const activeTab = resolveTab(tab, tracker.status);
   const analyzing = tracker.status === "analyzing";
   // The report is done but its page was never written (the function was stopped in between).
@@ -165,7 +172,12 @@ export default async function TrackerPage({ params, searchParams }: PageProps) {
         {activeTab === "timeline" ? (
           <Timeline snapshots={snapshots} tracker={tracker} />
         ) : activeTab === "citations" ? (
-          <CitationsTable rows={citationRows} totalDays={snapshots.length} targetDomain={tracker.target_domain} />
+          <CitationsTable
+            rows={citationRows}
+            totalSamples={totals.samples}
+            totalDays={totals.days}
+            targetDomain={tracker.target_domain}
+          />
         ) : activeTab === "report" ? (
           needsReport ? (
             <ReportAutoStart trackerId={tracker.id} daysTarget={tracker.days_target} />
@@ -174,6 +186,7 @@ export default async function TrackerPage({ params, searchParams }: PageProps) {
               tracker={tracker}
               analysis={analysis}
               snapshotsWithOverview={snapshotsWithOverview}
+              daysWithOverview={totals.daysWithOverview}
               dayCount={tracker.day_count}
               staleReport={reportStale}
             />

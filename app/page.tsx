@@ -24,8 +24,8 @@ const steps = [
     body: "Type the Google search your customers use. We take the first snapshot right away.",
   },
   {
-    title: "We watch the AI Overview for 7 days",
-    body: "Every day we save the full answer and every page Google cites, and show what changed.",
+    title: "We watch the AI Overview for 7 days, three samples a day",
+    body: "Google gives a different answer every time it is asked. So each day we save three answers and every page they cite, and show what stays the same.",
   },
   {
     title: "You get the patterns, the cited pages, and a better page written for you",
@@ -42,7 +42,7 @@ const features = [
   {
     icon: Globe,
     title: "Citations",
-    body: "Every page Google cited, ranked by how many days it showed up. The sources Google trusts.",
+    body: "Every page Google cited, ranked by how many samples it showed up in. The sources Google trusts.",
   },
   {
     icon: FileText,
@@ -77,14 +77,14 @@ function PreviewCard() {
             <Globe className="h-4 w-4 shrink-0 text-ink-soft" />
             <span className="truncate">Industry guide</span>
           </span>
-          <Chip tone="good">3 of 3 days</Chip>
+          <Chip tone="good">9 of 9 samples</Chip>
         </li>
         <li className="flex items-center justify-between gap-3 px-3 py-2.5">
           <span className="flex min-w-0 items-center gap-2">
             <Globe className="h-4 w-4 shrink-0 text-ink-soft" />
             <span className="truncate">Comparison review</span>
           </span>
-          <Chip tone="good">2 of 3 days</Chip>
+          <Chip tone="good">6 of 9 samples</Chip>
         </li>
         <li className="flex items-center justify-between gap-3 px-3 py-2.5">
           <span className="flex min-w-0 items-center gap-2">

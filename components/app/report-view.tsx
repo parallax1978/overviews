@@ -23,8 +23,10 @@ export interface ReportViewProps {
   tracker: Pick<Tracker, "id" | "status" | "days_target">;
   /** The newest analysis row, or null when none has been started. */
   analysis: Analysis | null;
-  /** Days on which an AI Overview actually appeared. */
+  /** Samples (across all days) in which an AI Overview actually appeared. */
   snapshotsWithOverview: number;
+  /** Days with at least one sample that had an AI Overview; a fallback denominator for reports without days_total. */
+  daysWithOverview?: number;
   /** Days captured so far. */
   dayCount: number;
   /** All days are in and the report predates the newest capture: offer a fresh one. */
@@ -39,7 +41,14 @@ const REPORT_CONTENTS = [
 ];
 
 /** Report tab: intro and "Analyze now" before the report exists, progress while it runs, then the report. */
-export function ReportView({ tracker, analysis, snapshotsWithOverview, dayCount, staleReport = false }: ReportViewProps) {
+export function ReportView({
+  tracker,
+  analysis,
+  snapshotsWithOverview,
+  daysWithOverview = 0,
+  dayCount,
+  staleReport = false,
+}: ReportViewProps) {
   if (tracker.status === "analyzing" || analysis?.status === "running") {
     return <Progress step={analysis?.step ?? null} />;
   }
@@ -50,7 +59,7 @@ export function ReportView({ tracker, analysis, snapshotsWithOverview, dayCount,
     snapshotsWithOverview < 1
       ? allDaysIn
         ? `No AI Overview appeared on any of the ${tracker.days_target} days. This search may not show one. Try a different search.`
-        : "No AI Overview has appeared for this search yet. We need at least one day with one."
+        : "No AI Overview has appeared for this search yet. We need at least one sample with one."
       : null;
 
   if (!analysis || analysis.status !== "done") {
@@ -83,13 +92,18 @@ export function ReportView({ tracker, analysis, snapshotsWithOverview, dayCount,
           <div>
             <p className="font-semibold text-ink">All {tracker.days_target} days are in.</p>
             <p className="mt-1 text-sm text-ink-muted">
-              This report was built before the last captures. A fresh one uses every day.
+              This report was built before the last captures. A fresh one uses every sample from every day.
             </p>
           </div>
           <AnalyzeButton trackerId={tracker.id} disabled={false} reason={null} label="Update the report" />
         </Card>
       ) : null}
-      <Report tracker={tracker} analysis={analysis} snapshotsWithOverview={snapshotsWithOverview} />
+      <Report
+        tracker={tracker}
+        analysis={analysis}
+        snapshotsWithOverview={snapshotsWithOverview}
+        daysWithOverview={daysWithOverview}
+      />
     </div>
   );
 }
@@ -135,7 +149,7 @@ function Intro({
       <div className="mt-6 border-t border-line pt-5">
         {allDaysIn ? null : (
           <p className="mb-3 text-sm text-ink-muted">
-            Can&apos;t wait? You can get a first report from today&apos;s capture. Patterns get clearer with
+            Can&apos;t wait? You can get a first report from today&apos;s samples. Patterns get clearer with
             every day, and we write a fresh report once all {tracker.days_target} days are in.
           </p>
         )}
@@ -173,10 +187,12 @@ function Report({
   tracker,
   analysis,
   snapshotsWithOverview,
+  daysWithOverview,
 }: {
   tracker: Pick<Tracker, "id">;
   analysis: Analysis;
   snapshotsWithOverview: number;
+  daysWithOverview: number;
 }) {
   const patterns = analysis.patterns;
   const research = analysis.citation_research ?? [];
@@ -185,11 +201,23 @@ function Report({
   const entities = patterns?.repeated_entities ?? [];
   const sources = patterns?.frequent_sources ?? [];
   const differences = patterns?.differences ?? [];
+  // The report records how many samples and days it was built from. Older reports
+  // (one sample per day, no totals) fall back to what the snapshots and the counts say.
+  const totalSamples = Math.max(
+    analysis.samples_total ?? snapshotsWithOverview,
+    1,
+    ...claims.map((c) => samplesOr(c.samples_present, c.days_present)),
+    ...entities.map((e) => samplesOr(e.samples_present, e.days_present)),
+    ...sources.map((s) => samplesOr(s.samples_cited, s.days_cited)),
+    ...research.map((r) => samplesOr(r.samples_cited, r.days_cited)),
+  );
   const totalDays = Math.max(
-    snapshotsWithOverview,
+    analysis.days_total ?? daysWithOverview,
+    1,
     ...claims.map((c) => c.days_present),
     ...entities.map((e) => e.days_present),
     ...sources.map((s) => s.days_cited),
+    ...research.map((r) => r.days_cited),
   );
 
   return (
@@ -217,9 +245,13 @@ function Report({
               <li key={index} className="px-4 py-3">
                 <div className="flex flex-wrap items-start justify-between gap-2">
                   <p className="font-medium text-ink">{claim.claim}</p>
-                  <Chip tone="brand">
-                    {claim.days_present} of {totalDays} days
-                  </Chip>
+                  <SeenIn
+                    samples={samplesOr(claim.samples_present, claim.days_present)}
+                    totalSamples={totalSamples}
+                    days={claim.days_present}
+                    totalDays={totalDays}
+                    tone="brand"
+                  />
                 </div>
                 {claim.example ? <p className="mt-1 text-sm text-ink-muted">&ldquo;{claim.example}&rdquo;</p> : null}
               </li>
@@ -235,7 +267,13 @@ function Report({
               <li key={index} className="rounded-xl border border-line bg-white px-4 py-3">
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <span className="font-semibold text-ink">{entity.entity}</span>
-                  <Chip tone="neutral">{pluralize(entity.days_present, "day")}</Chip>
+                  <SeenIn
+                    samples={samplesOr(entity.samples_present, entity.days_present)}
+                    totalSamples={totalSamples}
+                    days={entity.days_present}
+                    totalDays={totalDays}
+                    tone="neutral"
+                  />
                 </div>
                 {entity.role ? <p className="mt-1 text-sm text-ink-muted">{entity.role}</p> : null}
               </li>
@@ -264,7 +302,13 @@ function Report({
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-center gap-2">
                     <span className="font-semibold text-ink">{source.domain}</span>
-                    <Chip tone="brand">{pluralize(source.days_cited, "day")}</Chip>
+                    <SeenIn
+                      samples={samplesOr(source.samples_cited, source.days_cited)}
+                      totalSamples={totalSamples}
+                      days={source.days_cited}
+                      totalDays={totalDays}
+                      tone="brand"
+                    />
                   </div>
                   {source.cited_for ? <p className="mt-1 text-sm text-ink-muted">Cited for: {source.cited_for}</p> : null}
                 </div>
@@ -313,7 +357,9 @@ function Report({
                     {item.domain}
                     <ExternalLink className="h-3.5 w-3.5 text-ink-soft" aria-hidden="true" />
                   </a>
-                  <Chip tone="neutral">{pluralize(item.days_cited, "day")}</Chip>
+                  <Chip tone="neutral">
+                    {samplesOr(item.samples_cited, item.days_cited)} of {totalSamples} samples
+                  </Chip>
                   <Chip tone={item.fetched ? "good" : "warn"}>
                     {item.fetched ? "We read the page" : "From Google's snippet only"}
                   </Chip>
@@ -454,6 +500,37 @@ function Report({
 
 // ---------------------------------------------------------------------------
 // Small building blocks
+
+/** Reports written before sampling carry only day counts; back then one sample was one day. */
+function samplesOr(samples: number | null | undefined, days: number): number {
+  return typeof samples === "number" && Number.isFinite(samples) ? samples : days;
+}
+
+/** "18 of 21 samples" as a chip, with the day count muted beside it. */
+function SeenIn({
+  samples,
+  totalSamples,
+  days,
+  totalDays,
+  tone,
+}: {
+  samples: number;
+  totalSamples: number;
+  days: number;
+  totalDays: number;
+  tone: "brand" | "neutral";
+}) {
+  return (
+    <span className="inline-flex flex-wrap items-center gap-1.5">
+      <Chip tone={tone}>
+        {samples} of {totalSamples} samples
+      </Chip>
+      <span className="text-xs text-ink-muted">
+        ({days} of {totalDays} days)
+      </span>
+    </span>
+  );
+}
 
 function Section({ eyebrow, title, children }: { eyebrow: string; title: string; children: ReactNode }) {
   return (

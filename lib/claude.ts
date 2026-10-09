@@ -9,7 +9,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 import { z } from "zod";
 import { serverEnv } from "@/lib/env";
-import { domainFromUrl } from "@/lib/utils";
+import { domainFromUrl, pluralize } from "@/lib/utils";
 import {
   ANALYSIS_SYSTEM_PROMPT,
   DRAFT_SYSTEM_PROMPT,
@@ -55,8 +55,22 @@ function getClient(): Anthropic {
 // ---------------------------------------------------------------------------
 
 export const PatternsSchema = z.object({
-  recurring_claims: z.array(z.object({ claim: z.string(), days_present: z.number().int(), example: z.string() })),
-  repeated_entities: z.array(z.object({ entity: z.string(), days_present: z.number().int(), role: z.string() })),
+  recurring_claims: z.array(
+    z.object({
+      claim: z.string(),
+      samples_present: z.number().int(),
+      days_present: z.number().int(),
+      example: z.string(),
+    }),
+  ),
+  repeated_entities: z.array(
+    z.object({
+      entity: z.string(),
+      samples_present: z.number().int(),
+      days_present: z.number().int(),
+      role: z.string(),
+    }),
+  ),
   formats: z.object({
     opening: z.string(),
     structure: z.string(),
@@ -65,7 +79,13 @@ export const PatternsSchema = z.object({
     typical_length_words: z.number().int(),
   }),
   frequent_sources: z.array(
-    z.object({ domain: z.string(), url: z.string(), days_cited: z.number().int(), cited_for: z.string() }),
+    z.object({
+      domain: z.string(),
+      url: z.string(),
+      samples_cited: z.number().int(),
+      days_cited: z.number().int(),
+      cited_for: z.string(),
+    }),
   ),
   differences: z.array(z.object({ day: z.number().int(), what_changed: z.string() })),
   stable_core: z.string(),
@@ -74,6 +94,7 @@ export const PatternsSchema = z.object({
 export const CitationResearchItemSchema = z.object({
   url: z.string(),
   domain: z.string(),
+  samples_cited: z.number().int(),
   days_cited: z.number().int(),
   fetched: z.boolean(),
   answers_how_fast: z.string(),
@@ -140,13 +161,17 @@ export interface AnalysisHooks {
 // Candidate pages
 // ---------------------------------------------------------------------------
 
-/** Every cited URL ranked by the number of distinct days it was cited (ties keep first-seen order), top `limit`. */
+/**
+ * Every cited URL ranked by the number of distinct samples it was cited in,
+ * then by distinct days (ties keep first-seen order), top `limit`. Each
+ * snapshot is one sample and counts once, however many times it cites the URL.
+ */
 export function rankCandidateUrls(
   snapshots: AnalysisSnapshotInput[],
   limit = MAX_FETCH_CANDIDATES,
 ): CandidateUrl[] {
-  const byUrl = new Map<string, CandidateUrl & { days: Set<number> }>();
-  for (const snap of snapshots) {
+  const byUrl = new Map<string, CandidateUrl & { samples: Set<number>; days: Set<number> }>();
+  for (const [index, snap] of snapshots.entries()) {
     if (!snap.has_overview) continue;
     for (const ref of snap.references ?? []) {
       if (!ref.url) continue;
@@ -156,18 +181,21 @@ export function rankCandidateUrls(
           url: ref.url,
           domain: ref.domain || domainFromUrl(ref.url),
           title: ref.title ?? null,
+          samples_cited: 0,
           days_cited: 0,
+          samples: new Set<number>(),
           days: new Set<number>(),
         };
         byUrl.set(ref.url, entry);
       }
+      entry.samples.add(index);
       entry.days.add(snap.day_number);
       if (!entry.title && ref.title) entry.title = ref.title;
     }
   }
   return [...byUrl.values()]
-    .map(({ days, ...rest }) => ({ ...rest, days_cited: days.size }))
-    .sort((a, b) => b.days_cited - a.days_cited)
+    .map(({ samples, days, ...rest }) => ({ ...rest, samples_cited: samples.size, days_cited: days.size }))
+    .sort((a, b) => b.samples_cited - a.samples_cited || b.days_cited - a.days_cited)
     .slice(0, limit);
 }
 
@@ -334,12 +362,13 @@ async function runStructured<S extends z.ZodType>(call: StructuredCall<S>): Prom
 // Call 1: analyze
 // ---------------------------------------------------------------------------
 
-/** Find the patterns across all captured days, study the most-cited pages, and build the page blueprint. */
+/** Find the patterns across every sample of every captured day, study the most-cited pages, and build the page blueprint. */
 export async function analyzeOverviews(input: AnalysisInput, hooks: AnalysisHooks = {}): Promise<AnalysisOutput> {
   const candidates = rankCandidateUrls(input.snapshots);
-  const dayCount = input.snapshots.length;
+  const sampleCount = input.snapshots.length;
+  const dayCount = new Set(input.snapshots.map((s) => s.day_number)).size;
   const steps = [
-    `Reading ${dayCount} ${dayCount === 1 ? "day" : "days"} of AI Overviews`,
+    `Reading ${pluralize(dayCount, "day")} of AI Overviews (${pluralize(sampleCount, "sample")})`,
     `Studying up to ${candidates.length} cited pages`,
     "Finding the patterns",
   ];

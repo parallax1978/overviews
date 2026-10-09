@@ -4,7 +4,7 @@ import { LoaderCircle, Sparkles } from "lucide-react";
 import { useActionState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { LANGUAGES, LOCATIONS } from "@/lib/types";
+import { LANGUAGES, LOCATIONS, SAMPLES_PER_DAY } from "@/lib/types";
 import { createTrackerAction } from "./actions";
 
 const DEFAULT_LOCATION_CODE = 2840;
@@ -125,7 +125,7 @@ export function NewKeywordForm({ initialKeyword = "" }: { initialKeyword?: strin
           {pending ? (
             <>
               <LoaderCircle className="h-5 w-5 animate-spin" aria-hidden="true" />
-              Capturing today&apos;s AI Overview… about 20 seconds
+              Taking today&apos;s {SAMPLES_PER_DAY} samples… up to a minute
             </>
           ) : (
             <>
@@ -136,7 +136,9 @@ export function NewKeywordForm({ initialKeyword = "" }: { initialKeyword?: strin
         </Button>
         {pending ? null : (
           <p className="text-sm text-ink-muted">
-            We capture today&apos;s AI Overview right away, then once a day for 7 days.
+            We capture today&apos;s AI Overview right away, then every day for 7 days. Google gives a
+            different answer every time it is asked, so we take {SAMPLES_PER_DAY} samples a day and look
+            for what stays the same.
           </p>
         )}
       </div>
