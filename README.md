@@ -8,18 +8,26 @@ in [`CLAUDE.md`](./CLAUDE.md).
 
 ## How it works
 
-1. **Add a keyword.** We capture today's AI Overview immediately with DataForSEO.
-2. **We watch it for 7 days.** A daily cron captures the full answer and every citation.
-3. **You get the report and the page.** On day 7 Claude finds the patterns, reads the most-cited
-   pages, and writes a page built around the findings, with placeholders for your own data.
+1. **Add a keyword.** We capture today's AI Overview immediately with DataForSEO: three samples,
+   because Google generates a different answer for every request (three identical back-to-back
+   requests for one keyword shared no cited source).
+2. **We watch it for 7 days.** A daily cron takes three more samples each day and stores the full
+   answer and every citation of each one.
+3. **You get the report and the page.** Claude counts what survives across all samples, reads the
+   most-cited pages, and plans a page that beats them: a winning angle, the gaps no page fills,
+   the contradictions between sources, and three things nobody has. Then it writes that page, with
+   placeholders for your own data. The report is available from day one and refreshed on day 7.
 4. **Keep tracking.** After you publish, we keep checking and tell you when your site gets cited.
+
+Each keyword chooses whether the page may name other brands. The default is no: the page positions
+your own site or product as the answer and never recommends a competitor.
 
 ## Setup (about 20 minutes)
 
 ### 1. Supabase
 
 1. Create a project at https://supabase.com/dashboard.
-2. Open the SQL editor and run `supabase/migrations/0001_init.sql`
+2. Open the SQL editor and run every file in `supabase/migrations/` in order
    (or `supabase link` + `supabase db push` with the CLI).
 3. Authentication: follow [`docs/auth-setup.md`](./docs/auth-setup.md). The app uses email codes
    and magic links, no passwords.
@@ -31,8 +39,9 @@ in [`CLAUDE.md`](./CLAUDE.md).
 1. Create an account at https://app.dataforseo.com and add the minimum $50 balance.
 2. API Access: copy the API login and password.
 
-Each daily capture costs about $0.004 (Live SERP $0.002 plus the async AI Overview surcharge,
-refunded when the overview is cached or absent), about $0.03 per keyword week.
+Each request costs about $0.004 (Live SERP $0.002 plus the async AI Overview surcharge, refunded
+when the overview is cached or absent). With three samples a day that is about $0.012 per keyword
+per day, under $0.09 per keyword week.
 
 ### 3. Anthropic
 
@@ -50,6 +59,13 @@ DataForSEO response:
 
 ```
 npx tsx scripts/analyze-fixture.ts
+```
+
+To rebuild the report and draft for a real keyword exactly as the app does (for example after a
+prompt change):
+
+```
+npx tsx scripts/run-analysis.ts <tracker-id>
 ```
 
 ### 4. Environment variables

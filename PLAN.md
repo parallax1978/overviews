@@ -1,5 +1,12 @@
 # Legiit Overviews: build plan
 
+> Status: built and deployed. Three things changed from this plan during the build, after
+> measuring real data: (1) each daily capture takes three samples, because Google generates a
+> different AI Overview per request, and reports count across samples; (2) the report and the
+> draft run as separate requests, each a few minutes long; (3) the blueprint plans a page that
+> beats the cited pages (winning angle, gaps, contradictions) and each keyword chooses whether the
+> page may name other brands (default: no). `README.md` describes the current behavior.
+
 A small SaaS that does exactly what Jake Ward's thread describes
 (https://x.com/jakezward/status/2107453596107219294):
 
