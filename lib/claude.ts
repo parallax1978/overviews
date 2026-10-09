@@ -198,10 +198,14 @@ export function anthropicErrorStatus(err: unknown): number | null {
   return err instanceof Anthropic.APIError && typeof err.status === "number" ? err.status : null;
 }
 
+/**
+ * True when the API refused the request because of output_config.format itself
+ * (unsupported combination, or a schema whose compiled grammar is too large).
+ */
 function isFormatRejection(err: unknown): boolean {
   return (
     err instanceof Anthropic.BadRequestError &&
-    /output_config|output_format|json_schema|structured output/i.test(err.message)
+    /output_config|output_format|json_schema|structured output|grammar|schema/i.test(err.message)
   );
 }
 
