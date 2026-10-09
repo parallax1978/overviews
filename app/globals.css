@@ -1,0 +1,166 @@
+@import "tailwindcss";
+@import "@fontsource-variable/inter";
+
+/*
+  Design tokens lifted from legiitkeywords.com (exact values).
+  Use the Tailwind utilities these generate (text-ink, bg-brand, border-line, ...)
+  instead of raw hex values anywhere in the app.
+*/
+@theme {
+  --font-sans: "Inter Variable", Inter, ui-sans-serif, system-ui, -apple-system,
+    "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono",
+    monospace;
+
+  --color-ink: #0f172a;
+  --color-ink-muted: #64748b;
+  --color-ink-soft: #94a3b8;
+  --color-line: #e5e7eb;
+  --color-line-strong: #d1d5db;
+  --color-surface: #ffffff;
+  --color-surface-alt: #f7f7fb;
+  --color-surface-sunken: #f1f1f6;
+  --color-brand: #8a12dc;
+  --color-brand-strong: #6e0db1;
+  --color-brand-soft: #e9d5ff;
+  --color-brand-faint: #f3e8ff;
+  --color-plum: #12081f;
+  --color-good: #15803d;
+  --color-good-soft: #dcfce7;
+  --color-warn: #b45309;
+  --color-warn-soft: #fef3c7;
+  --color-bad: #b91c1c;
+  --color-bad-soft: #fee2e2;
+
+  --radius-card: 0.75rem;
+
+  --shadow-glow: 0 8px 24px -8px #8a12dc99;
+  --shadow-pop: 0 8px 30px #0f172a1f, 0 2px 6px #0f172a0f;
+}
+
+@layer base {
+  html {
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+  body {
+    background: var(--color-surface);
+    color: var(--color-ink);
+  }
+}
+
+@utility brand-gradient {
+  background-image: linear-gradient(135deg, #8a12dc, #1863dc);
+}
+
+@utility text-gradient {
+  color: transparent;
+  background-image: linear-gradient(90deg, #a855f7, #d946ef 55%, #ec4899);
+  -webkit-background-clip: text;
+  background-clip: text;
+}
+
+@utility hero-dark {
+  color: #fff;
+  background-color: var(--color-plum);
+  background-image:
+    radial-gradient(60% 80% at 50% 110%, #8a12dc73, transparent 70%),
+    radial-gradient(#ffffff0f 1px, transparent 0);
+  background-size:
+    auto,
+    22px 22px;
+}
+
+@utility eyebrow {
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+/* Rendered markdown (AI Overview text, reports, drafts). */
+@utility prose-overview {
+  font-size: 0.9375rem;
+  line-height: 1.7;
+  color: var(--color-ink);
+  & h1,
+  & h2,
+  & h3,
+  & h4 {
+    font-weight: 700;
+    letter-spacing: -0.015em;
+    color: var(--color-ink);
+    margin-top: 1.5em;
+    margin-bottom: 0.5em;
+  }
+  & h1 {
+    font-size: 1.5rem;
+  }
+  & h2 {
+    font-size: 1.25rem;
+  }
+  & h3 {
+    font-size: 1.0625rem;
+  }
+  & p {
+    margin: 0.75em 0;
+  }
+  & ul,
+  & ol {
+    margin: 0.75em 0;
+    padding-left: 1.4em;
+  }
+  & ul {
+    list-style: disc;
+  }
+  & ol {
+    list-style: decimal;
+  }
+  & li {
+    margin: 0.3em 0;
+  }
+  & a {
+    color: var(--color-brand);
+    text-decoration: underline;
+    text-underline-offset: 2px;
+  }
+  & strong {
+    font-weight: 600;
+  }
+  & table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 1em 0;
+    font-size: 0.875rem;
+  }
+  & th,
+  & td {
+    border: 1px solid var(--color-line);
+    padding: 0.5rem 0.75rem;
+    text-align: left;
+    vertical-align: top;
+  }
+  & th {
+    background: var(--color-surface-alt);
+    font-weight: 600;
+  }
+  & code {
+    font-family: var(--font-mono);
+    font-size: 0.85em;
+    background: var(--color-surface-sunken);
+    padding: 0.1em 0.35em;
+    border-radius: 0.25rem;
+  }
+  & blockquote {
+    border-left: 3px solid var(--color-brand-soft);
+    padding-left: 1em;
+    color: var(--color-ink-muted);
+    margin: 1em 0;
+  }
+  & hr {
+    border: 0;
+    border-top: 1px solid var(--color-line);
+    margin: 1.5em 0;
+  }
+}
