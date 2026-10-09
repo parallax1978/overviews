@@ -4,12 +4,14 @@ import { notFound } from "next/navigation";
 import { ArrowLeft, CircleCheck, Globe, TriangleAlert } from "lucide-react";
 import { AutoRefresh } from "@/components/app/auto-refresh";
 import { CitationsTable } from "@/components/app/citations-table";
+import { DraftAutoStart } from "@/components/app/draft-auto-start";
 import { DraftView } from "@/components/app/draft-view";
 import { ReportView } from "@/components/app/report-view";
 import { StatusChip } from "@/components/app/status-chip";
 import { Timeline } from "@/components/app/timeline";
 import { TrackerControls } from "@/components/app/tracker-controls";
 import { Chip } from "@/components/ui/chip";
+import { recoverStaleAnalysis } from "@/lib/analyze";
 import { aggregateCitations } from "@/lib/citations";
 import { createClient } from "@/lib/supabase/server";
 import { LANGUAGES, type Analysis, type Draft, type Snapshot, type Tracker } from "@/lib/types";
@@ -48,7 +50,21 @@ export default async function TrackerPage({ params, searchParams }: PageProps) {
     throw new Error(`Could not load the keyword: ${trackerError.message}`);
   }
   if (!trackerRow) notFound();
-  const tracker = trackerRow as Tracker;
+  let tracker = trackerRow as Tracker;
+
+  // A report the platform stopped mid-way would show "Writing your report" forever.
+  // Recovery is idempotent and only touches trackers stuck for 15+ minutes.
+  if (tracker.status === "analyzing") {
+    try {
+      const { recovered } = await recoverStaleAnalysis(id);
+      if (recovered) {
+        const { data: fresh } = await supabase.from("trackers").select("*").eq("id", id).maybeSingle();
+        if (fresh) tracker = fresh as Tracker;
+      }
+    } catch (err) {
+      console.error("stale analysis recovery failed", err instanceof Error ? err.message : err);
+    }
+  }
 
   const [snapshotsRes, analysisRes, draftRes] = await Promise.all([
     supabase.from("snapshots").select("*").eq("tracker_id", id).order("day_number", { ascending: true }),
@@ -79,12 +95,15 @@ export default async function TrackerPage({ params, searchParams }: PageProps) {
   const snapshotsWithOverview = snapshots.filter((s) => s.has_overview).length;
   const activeTab = resolveTab(tab, tracker.status);
   const analyzing = tracker.status === "analyzing";
+  // The report is done but its page was never written (the function was stopped in between).
+  const needsDraft = tracker.status === "analyzed" && analysis?.status === "done" && draft?.analysis_id !== analysis.id;
   const languageName = LANGUAGES.find((l) => l.code === tracker.language_code)?.name ?? tracker.language_code;
   const deviceName = tracker.device === "mobile" ? "Mobile" : "Desktop";
 
   return (
     <div>
       {analyzing ? <AutoRefresh intervalMs={4000} /> : null}
+      {needsDraft && activeTab !== "draft" ? <DraftAutoStart trackerId={tracker.id} silent /> : null}
 
       <Link href="/app" className="inline-flex items-center gap-1.5 text-sm text-ink-muted hover:text-ink">
         <ArrowLeft className="h-4 w-4" aria-hidden="true" />
@@ -148,6 +167,8 @@ export default async function TrackerPage({ params, searchParams }: PageProps) {
             snapshotsWithOverview={snapshotsWithOverview}
             dayCount={tracker.day_count}
           />
+        ) : needsDraft ? (
+          <DraftAutoStart trackerId={tracker.id} />
         ) : (
           <DraftView
             trackerId={tracker.id}

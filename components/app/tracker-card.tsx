@@ -3,8 +3,9 @@ import Link from "next/link";
 import { ArrowRight, CircleCheck, Clock, Globe, TriangleAlert, X } from "lucide-react";
 import { StatusChip } from "@/components/app/status-chip";
 import { Chip } from "@/components/ui/chip";
+import { LocalTime } from "@/components/ui/local-time";
 import type { Tracker } from "@/lib/types";
-import { formatDateTime, pluralize } from "@/lib/utils";
+import { pluralize } from "@/lib/utils";
 
 /** Numbers the dashboard derives from a tracker's snapshots. */
 export interface TrackerStats {
@@ -42,7 +43,7 @@ export function TrackerCard({ tracker, stats }: { tracker: Tracker; stats: Track
       : tracker.last_error;
   const showError = tracker.status === "error" && !!errorPreview;
   const showCited = tracker.cited_on_day != null;
-  const showNextCapture = capturesContinue(tracker) && !!tracker.next_capture_at;
+  const nextCaptureAt = capturesContinue(tracker) ? tracker.next_capture_at : null;
 
   return (
     <Link
@@ -77,10 +78,12 @@ export function TrackerCard({ tracker, stats }: { tracker: Tracker; stats: Track
             </div>
           ) : null}
 
-          {showNextCapture ? (
+          {nextCaptureAt ? (
             <p className="mt-2 flex items-center gap-1.5 text-xs text-ink-soft">
               <Clock className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
-              Next capture {formatDateTime(tracker.next_capture_at)}
+              <span>
+                Next capture <LocalTime iso={nextCaptureAt} mode="relative" />
+              </span>
             </p>
           ) : null}
         </div>

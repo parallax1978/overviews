@@ -56,6 +56,60 @@ function restingStatus(tracker: Tracker): Tracker["status"] {
   return tracker.day_count >= tracker.days_target ? "ready" : "tracking";
 }
 
+/** Error recorded when the platform stopped a report before it finished (e.g. the function hit maxDuration). */
+const STALE_ANALYSIS_MESSAGE = "This took too long and was stopped. Try again.";
+
+/** An "analyzing" tracker whose newest analyses row is older than this is considered abandoned. */
+const STALE_ANALYSIS_MS = 15 * 60 * 1000;
+
+/**
+ * Put a tracker that is stuck in "analyzing" back into a resting state. The
+ * analysis and the draft run inside one request; when the platform stops that
+ * function nothing would ever update the rows again. Idempotent and cheap, so
+ * callers run it before acting on the tracker. Returns whether anything changed.
+ */
+export async function recoverStaleAnalysis(trackerId: string): Promise<{ recovered: boolean }> {
+  const admin = createAdminClient();
+  const tracker = await loadTracker(admin, trackerId);
+  if (tracker.status !== "analyzing") return { recovered: false };
+
+  const { data: analysisRow, error: analysisError } = await admin
+    .from("analyses")
+    .select("*")
+    .eq("tracker_id", trackerId)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (analysisError) throw new Error(analysisError.message);
+  const analysis = analysisRow as Analysis | null;
+
+  const stale = !analysis || Date.now() - new Date(analysis.created_at).getTime() > STALE_ANALYSIS_MS;
+  if (!stale) return { recovered: false };
+
+  if (analysis?.status === "running") {
+    const { error } = await admin
+      .from("analyses")
+      .update({ status: "error", step: null, error: STALE_ANALYSIS_MESSAGE })
+      .eq("id", analysis.id);
+    if (error) throw new Error(error.message);
+  } else if (analysis?.status === "done" && analysis.step) {
+    // The report finished but the page was never written: drop the leftover progress label.
+    await admin.from("analyses").update({ step: null }).eq("id", analysis.id);
+  }
+
+  const analyzed = analysis?.status === "done";
+  const { error: trackerError } = await admin
+    .from("trackers")
+    .update({
+      status: analyzed ? "analyzed" : restingStatus(tracker),
+      last_error: analyzed ? null : (analysis?.status === "error" && analysis.error) || STALE_ANALYSIS_MESSAGE,
+    })
+    .eq("id", trackerId);
+  if (trackerError) throw new Error(trackerError.message);
+
+  return { recovered: true };
+}
+
 /**
  * Run the full pipeline for a tracker: analysis (patterns, citation research,
  * blueprint, summary) followed by the first draft. Marks the tracker

@@ -1,10 +1,11 @@
 import { Clock, ExternalLink, TriangleAlert } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Chip } from "@/components/ui/chip";
+import { LocalTime } from "@/components/ui/local-time";
 import { Markdown } from "@/components/ui/markdown";
 import { NumberBadge } from "@/components/ui/number-badge";
 import type { OverviewReference, Snapshot, Tracker } from "@/lib/types";
-import { domainFromUrl, domainMatches, formatDateTime, pluralize } from "@/lib/utils";
+import { domainFromUrl, domainMatches, pluralize } from "@/lib/utils";
 
 export interface TimelineProps {
   /** Any order; the component shows the newest day first. */
@@ -42,7 +43,7 @@ function DayCard({ snapshot, targetDomain }: { snapshot: Snapshot; targetDomain:
           <h2 className="text-base font-bold text-ink">Day {snapshot.day_number}</h2>
           <p className="flex items-center gap-1 text-xs text-ink-muted">
             <Clock className="h-3 w-3" aria-hidden="true" />
-            {formatDateTime(snapshot.captured_at)}
+            <LocalTime iso={snapshot.captured_at} mode="datetime" />
           </p>
         </div>
         {snapshot.has_overview ? (

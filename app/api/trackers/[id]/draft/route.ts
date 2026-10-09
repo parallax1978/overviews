@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { regenerateDraft } from "@/lib/analyze";
+import { recoverStaleAnalysis, regenerateDraft } from "@/lib/analyze";
 import { getUser } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import type { Tracker } from "@/lib/types";
@@ -39,7 +39,22 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   const { data: row, error } = await supabase.from("trackers").select("*").eq("id", id).maybeSingle();
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   if (!row) return NextResponse.json({ error: "We couldn't find that keyword." }, { status: 404 });
-  const tracker = row as Tracker;
+  let tracker = row as Tracker;
+
+  // A report that finished but whose page was never written (the function was
+  // stopped) is still marked "analyzing": recover it so the draft can be written.
+  if (tracker.status === "analyzing") {
+    try {
+      const { recovered } = await recoverStaleAnalysis(id);
+      if (recovered) {
+        const { data: fresh } = await supabase.from("trackers").select("*").eq("id", id).maybeSingle();
+        if (fresh) tracker = fresh as Tracker;
+      }
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "We couldn't check on the last report.";
+      return NextResponse.json({ error: message }, { status: 500 });
+    }
+  }
 
   if (tracker.status !== "analyzed") {
     return NextResponse.json({ error: "Build the report first, then you can write a new draft." }, { status: 422 });
