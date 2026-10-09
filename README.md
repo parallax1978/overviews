@@ -37,7 +37,20 @@ refunded when the overview is cached or absent), about $0.03 per keyword week.
 ### 3. Anthropic
 
 Create an API key at https://console.anthropic.com. Analysis and writing use `claude-opus-5-5`.
-Expect roughly $0.50 to $0.80 per keyword for the report and the draft.
+Measured on a real keyword: the analysis takes about 3 minutes (10 page fetches) and the draft
+about 2 minutes, roughly $0.90 together at list prices.
+
+Use a workspace key (`sk-ant-api03-...`). A personal key (`sk-ant-usr-...`) also works, but then
+set `ANTHROPIC_WORKSPACE_ID` to the workspace to bill (Console -> Settings -> Workspaces).
+The analysis reads cited pages with Anthropic's web fetch tool; make sure it is enabled for the
+organization in the Console.
+
+To test the Claude integration without the app, run one real analysis on the saved
+DataForSEO response:
+
+```
+npx tsx scripts/analyze-fixture.ts
+```
 
 ### 4. Environment variables
 
@@ -72,10 +85,14 @@ node scripts/capture-now.mjs
 
 1. Import the repo at https://vercel.com/new. The Pro plan is recommended (commercial use, and
    precise cron timing). Hobby works for testing: its daily cron runs within an hour of 06:00 UTC.
-2. Add every variable from step 4 in Project Settings -> Environment Variables.
+2. Add every variable from step 4 in Project Settings -> Environment Variables. If you connect
+   the Supabase integration from the Vercel marketplace it sets the three Supabase variables for
+   you; add the rest by hand.
 3. Deploy. `vercel.json` registers the daily cron at `/api/cron/capture`; Vercel sends
-   `Authorization: Bearer <CRON_SECRET>` automatically.
-4. In Supabase, add `https://<your-domain>/auth/confirm` to the auth Redirect URLs.
+   `Authorization: Bearer <CRON_SECRET>` automatically. Both long routes declare
+   `maxDuration = 300`, which every current Vercel plan allows.
+4. In Supabase, set the Site URL to your Vercel domain and add
+   `https://<your-domain>/auth/confirm` to the auth Redirect URLs.
 
 ## Commands
 

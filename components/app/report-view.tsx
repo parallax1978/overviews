@@ -42,16 +42,14 @@ export function ReportView({ tracker, analysis, snapshotsWithOverview, dayCount 
     return <Progress step={analysis?.step ?? null} />;
   }
 
-  const canAnalyze = snapshotsWithOverview >= 1 && (dayCount >= 2 || tracker.status === "ready");
+  const canAnalyze = snapshotsWithOverview >= 1;
   const allDaysIn = tracker.status === "ready" || dayCount >= tracker.days_target;
   const reason =
     snapshotsWithOverview < 1
       ? allDaysIn
         ? `No AI Overview appeared on any of the ${tracker.days_target} days. This search may not show one. Try a different search.`
         : "No AI Overview has appeared for this search yet. We need at least one day with one."
-      : dayCount < 2
-        ? "We need two days of captures first. Day 2 arrives tomorrow."
-        : null;
+      : null;
 
   if (!analysis || analysis.status !== "done") {
     return (
@@ -120,8 +118,8 @@ function Intro({
       <div className="mt-6 border-t border-line pt-5">
         {allDaysIn ? null : (
           <p className="mb-3 text-sm text-ink-muted">
-            Can&apos;t wait? Once two days are in, you can start early. Patterns get clearer with every day,
-            so the full {tracker.days_target} days give the best page.
+            Can&apos;t wait? You can get a first report from today&apos;s capture. Patterns get clearer with
+            every day, and we write a fresh report once all {tracker.days_target} days are in.
           </p>
         )}
         <AnalyzeButton trackerId={tracker.id} disabled={!canAnalyze} reason={reason} label={label} />

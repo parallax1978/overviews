@@ -50,10 +50,8 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
       { status: 422 },
     );
   }
-  if (tracker.day_count < 2 && tracker.status !== "ready") {
-    return NextResponse.json({ error: "Capture at least two days first" }, { status: 422 });
-  }
-
+  // One day with an AI Overview is enough for a first report; the report says how many
+  // days it is based on, and day 7 triggers a fresh one automatically.
   try {
     const { analysis, draft } = await runAnalysisAndDraft(id);
     return NextResponse.json({ analysisId: analysis.id, draftId: draft.id });
