@@ -178,11 +178,27 @@ export interface Analysis {
   error: string | null;
 }
 
+/**
+ * "researched": ready to publish, every figure sourced from the web and cited.
+ * "placeholders": the author fills in their own data where [ADD YOUR DATA: ...] marks it.
+ */
+export type DraftMode = "researched" | "placeholders";
+
+export interface DraftSource {
+  url: string;
+  title: string;
+  /** What the page took from this source, in a few words. */
+  used_for: string;
+}
+
 export interface Draft {
   id: string;
   tracker_id: string;
   analysis_id: string | null;
   created_at: string;
+  mode: DraftMode;
+  /** Sources a researched draft relied on; null or empty for placeholder drafts. */
+  sources: DraftSource[] | null;
   title: string | null;
   meta_description: string | null;
   h1: string | null;
