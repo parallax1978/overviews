@@ -479,6 +479,42 @@ export async function writeDraft(input: DraftInput): Promise<DraftOutput> {
         }
       : {}),
   });
-  // A placeholders draft cites nothing, whatever the model put in the field.
-  return { ...parsed, sources: researched ? parsed.sources : [], usage, model };
+  // A placeholders draft cites nothing, whatever the model put in the field. A
+  // researched draft sometimes lists its sources only in the page's "## Sources"
+  // section and leaves the field empty: read them from the page in that case.
+  const sources = researched
+    ? parsed.sources.length
+      ? parsed.sources
+      : extractSourcesFromMarkdown(parsed.content_md)
+    : [];
+  return { ...parsed, sources, usage, model };
+}
+
+/**
+ * Sources a page cites, read from its "## Sources" section (one Markdown link
+ * per bullet, with what it supports after the link). Falls back to every
+ * distinct inline link in the page when there is no such section. Pure.
+ */
+export function extractSourcesFromMarkdown(markdown: string): DraftSource[] {
+  const linkRe = /\[([^\]]+)\]\((https?:\/\/[^)\s]+)\)/g;
+  const seen = new Map<string, DraftSource>();
+  const add = (title: string, url: string, usedFor: string) => {
+    if (!seen.has(url)) seen.set(url, { url, title: title.trim(), used_for: usedFor.trim() });
+  };
+
+  const match = /^##\s+Sources\s*$/m.exec(markdown);
+  if (match) {
+    const section = markdown.slice(match.index + match[0].length).split(/^##\s+/m)[0];
+    for (const line of section.split("\n")) {
+      const bullet = line.trim().replace(/^[-*]\s+/, "");
+      const link = new RegExp(linkRe.source).exec(bullet);
+      if (!link) continue;
+      const rest = bullet.slice(link.index + link[0].length).replace(/^[\s:\u2014\u2013-]+/, "");
+      add(link[1], link[2], rest);
+    }
+  }
+  if (seen.size === 0) {
+    for (const link of markdown.matchAll(linkRe)) add(link[1], link[2], "");
+  }
+  return [...seen.values()];
 }

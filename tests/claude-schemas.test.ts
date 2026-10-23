@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { AnalysisSchema, DraftSchema, rankCandidateUrls } from "@/lib/claude";
+import { AnalysisSchema, DraftSchema, extractSourcesFromMarkdown, rankCandidateUrls } from "@/lib/claude";
 import {
   buildAnalysisUserPrompt,
   buildDraftUserPrompt,
@@ -416,5 +416,34 @@ describe("buildAnalysisUserPrompt", () => {
     expect(grouped.slice(s1, s2)).toContain("Day 1 sample 1 text");
     expect(grouped.slice(s3, day2)).toContain("Day 1 sample 3 text");
     expect(grouped).toContain("None. Google cited no pages");
+  });
+});
+
+describe("extractSourcesFromMarkdown", () => {
+  it("reads the Sources section, one link per bullet, with what it supports", () => {
+    const md = [
+      "# Title",
+      "",
+      "Fact one ([Google](https://developers.google.com/a)).",
+      "",
+      "## Sources",
+      "",
+      "- [Spam policies (Google)](https://developers.google.com/a): the link spam definition",
+      "- [About Legiit](https://legiit.com/about) — launch date and order volume",
+      "- [Spam policies (Google)](https://developers.google.com/a): repeated on purpose",
+      "",
+      "## Not sources",
+      "- [Elsewhere](https://example.com/x): must be ignored",
+    ].join("\n");
+    const sources = extractSourcesFromMarkdown(md);
+    expect(sources).toEqual([
+      { url: "https://developers.google.com/a", title: "Spam policies (Google)", used_for: "the link spam definition" },
+      { url: "https://legiit.com/about", title: "About Legiit", used_for: "launch date and order volume" },
+    ]);
+  });
+
+  it("falls back to the distinct inline links when there is no Sources section", () => {
+    const md = "Fact ([A](https://a.com/1)). Again ([A](https://a.com/1)). Other ([B](https://b.com/2)).";
+    expect(extractSourcesFromMarkdown(md).map((s) => s.url)).toEqual(["https://a.com/1", "https://b.com/2"]);
   });
 });
