@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Card, Panel } from "@/components/ui/card";
 import { Eyebrow } from "@/components/ui/eyebrow";
 import { Markdown } from "@/components/ui/markdown";
+import { DraftAutoStart, DraftPendingCard } from "@/components/app/draft-auto-start";
 import type { Draft, DraftMode, DraftSource } from "@/lib/types";
 import { cn, domainFromUrl } from "@/lib/utils";
 
@@ -20,6 +21,14 @@ export interface DraftViewProps {
   drafts: DraftVersions;
   /** True once the report exists, so a version can be written or rewritten. */
   canRegenerate: boolean;
+  /**
+   * The id of the finished report whose ready-to-publish version is missing: that
+   * pane then writes it by itself instead of offering a button. Null when nothing
+   * should start on its own.
+   */
+  autoStart?: string | null;
+  /** The server says the ready-to-publish version is being written right now (by the cron or another tab). */
+  writing?: boolean;
 }
 
 const MODES: DraftMode[] = ["researched", "placeholders"];
@@ -54,10 +63,18 @@ const NOTES_MAX = 2000;
 /**
  * Draft tab: a switch between the two versions of the written page, then the
  * selected one with copy, download and "regenerate with notes", or a card that
- * writes it when that version does not exist yet. Both versions arrive from the
- * server, so switching is instant.
+ * writes it when that version does not exist yet (by itself for the
+ * ready-to-publish version when `autoStart` names the report). Both versions
+ * arrive from the server, so switching is instant.
  */
-export function DraftView({ trackerId, keyword, drafts, canRegenerate }: DraftViewProps) {
+export function DraftView({
+  trackerId,
+  keyword,
+  drafts,
+  canRegenerate,
+  autoStart = null,
+  writing = false,
+}: DraftViewProps) {
   const [mode, setMode] = useState<DraftMode>(() => defaultMode(drafts));
   const writer = useDraftWriter(trackerId);
   const draft = drafts[mode];
@@ -85,6 +102,10 @@ export function DraftView({ trackerId, keyword, drafts, canRegenerate }: DraftVi
 
       {draft ? (
         <DraftBody draft={draft} mode={mode} keyword={keyword} writer={writer} canRegenerate={canRegenerate} />
+      ) : mode === "researched" && writing ? (
+        <DraftPendingCard />
+      ) : mode === "researched" && autoStart ? (
+        <DraftAutoStart trackerId={trackerId} analysisId={autoStart} />
       ) : (
         <MissingVersion mode={mode} writer={writer} canRegenerate={canRegenerate} />
       )}

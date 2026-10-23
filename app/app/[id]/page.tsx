@@ -11,7 +11,7 @@ import { StatusChip } from "@/components/app/status-chip";
 import { Timeline } from "@/components/app/timeline";
 import { TrackerControls } from "@/components/app/tracker-controls";
 import { Chip } from "@/components/ui/chip";
-import { isReportStale, recoverStaleAnalysis } from "@/lib/analyze";
+import { isDraftWriting, isReportStale, recoverStaleAnalysis } from "@/lib/analyze";
 import { ReportAutoStart } from "@/components/app/report-auto-start";
 import { aggregateCitations, countTotals } from "@/lib/citations";
 import { createClient } from "@/lib/supabase/server";
@@ -138,7 +138,9 @@ export default async function TrackerPage({ params, searchParams }: PageProps) {
   const activeTab = resolveTab(tab, hasReport);
   // The report is done but its ready-to-publish page was never written (the function was
   // stopped in between, or the report predates that version): write it on open.
-  const needsDraft = !analyzing && report !== null && drafts.researched === null;
+  // Another request (the cron, another tab) is writing the ready-to-publish page right now.
+  const draftWriting = report !== null && drafts.researched === null && isDraftWriting(report);
+  const needsDraft = !analyzing && report !== null && drafts.researched === null && !draftWriting;
   // All days are in but no report was ever built (the cron ran out of time): build it on open.
   const needsReport = tracker.status === "ready" && !analysis && snapshotsWithOverview > 0;
   // A report exists but days were captured after it: offer a fresh one once all days are in.
@@ -150,6 +152,7 @@ export default async function TrackerPage({ params, searchParams }: PageProps) {
   return (
     <div>
       {analyzing ? <AutoRefresh intervalMs={4000} /> : null}
+      {draftWriting && !analyzing ? <AutoRefresh intervalMs={5000} /> : null}
       {needsDraft && activeTab !== "draft" ? (
         <DraftAutoStart trackerId={tracker.id} analysisId={report.id} silent />
       ) : null}
@@ -228,10 +231,15 @@ export default async function TrackerPage({ params, searchParams }: PageProps) {
               staleReport={reportStale}
             />
           )
-        ) : needsDraft ? (
-          <DraftAutoStart trackerId={tracker.id} analysisId={report.id} />
         ) : (
-          <DraftView trackerId={tracker.id} keyword={tracker.keyword} drafts={drafts} canRegenerate={hasReport} />
+          <DraftView
+            trackerId={tracker.id}
+            keyword={tracker.keyword}
+            drafts={drafts}
+            canRegenerate={hasReport}
+            autoStart={needsDraft ? report.id : null}
+            writing={draftWriting}
+          />
         )}
       </div>
     </div>

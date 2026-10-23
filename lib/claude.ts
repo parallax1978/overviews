@@ -36,8 +36,15 @@ export const DRAFT_MAX_FETCHES = 10;
 export const WEB_SEARCH_COST_USD = 0.01;
 
 const FALLBACK_BETA = "server-side-fallback-2026-07-01";
-const ANALYSIS_MAX_TOKENS = 32000;
-const DRAFT_MAX_TOKENS = 32000;
+/**
+ * max_tokens covers everything one turn generates: the thinking before every
+ * web_fetch / web_search call, the tools' input, interim text, and only then
+ * the JSON answer, written last. A research loop can spend 20-30k tokens before
+ * the page, so give the answer room. Both calls stream, so no timeout is
+ * involved, and room left unused costs nothing.
+ */
+const ANALYSIS_MAX_TOKENS = 64000;
+const DRAFT_MAX_TOKENS = 64000;
 /** Server tools pause the turn after ~10 tool iterations; we resume this many times at most. */
 const MAX_PAUSE_RESUMES = 3;
 
@@ -273,12 +280,29 @@ function assertCompleted(message: BetaMessage): void {
   }
 }
 
-function lastTextBlock(message: BetaMessage): string {
+/**
+ * The final answer: the trailing run of text blocks. Web-search citations split
+ * one answer into several text blocks, so the last block alone may be only the
+ * tail of the JSON. Walking back to the first non-text block (a tool call or
+ * result, or thinking) leaves out any preamble text. Pure.
+ */
+export function finalText(message: Pick<BetaMessage, "content">): string {
+  const parts: string[] = [];
   for (let i = message.content.length - 1; i >= 0; i--) {
     const block = message.content[i];
-    if (block.type === "text" && block.text.trim()) return block.text;
+    if (block.type !== "text") break;
+    parts.unshift(block.text);
   }
-  throw new Error("Claude returned no text");
+  const text = parts.join("").trim();
+  if (!text) throw new Error("Claude returned no text");
+  return text;
+}
+
+/** The JSON object in a text that may hold prose around it (the no-grammar path). Pure. */
+export function jsonObjectIn(text: string): string {
+  const start = text.indexOf("{");
+  const end = text.lastIndexOf("}");
+  return start >= 0 && end > start ? text.slice(start, end + 1) : text;
 }
 
 function stripFences(text: string): string {
@@ -291,7 +315,7 @@ function parseOutput<S extends z.ZodType>(message: BetaMessage, schema: S): z.in
   assertCompleted(message);
   let json: unknown;
   try {
-    json = JSON.parse(stripFences(lastTextBlock(message)));
+    json = JSON.parse(jsonObjectIn(stripFences(finalText(message))));
   } catch {
     throw new Error("Claude returned something that is not valid JSON");
   }
@@ -349,7 +373,7 @@ function webSearchTool(opts: { maxUses: number }): Anthropic.Beta.BetaWebSearchT
 /**
  * One streamed, structured call. Resumes `pause_turn` (server tools hit their
  * per-turn limit) by echoing the assistant content back, and falls back to
- * "JSON in the last text block" once if the API rejects output_config.format
+ * "JSON in the final text" once if the API rejects output_config.format
  * together with the tools in use.
  */
 async function runStructured<S extends z.ZodType>(call: StructuredCall<S>): Promise<StructuredResult<z.infer<S>>> {

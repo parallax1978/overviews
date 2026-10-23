@@ -1,5 +1,13 @@
+import type Anthropic from "@anthropic-ai/sdk";
 import { describe, expect, it } from "vitest";
-import { AnalysisSchema, DraftSchema, extractSourcesFromMarkdown, rankCandidateUrls } from "@/lib/claude";
+import {
+  AnalysisSchema,
+  DraftSchema,
+  extractSourcesFromMarkdown,
+  finalText,
+  jsonObjectIn,
+  rankCandidateUrls,
+} from "@/lib/claude";
 import {
   buildAnalysisUserPrompt,
   buildDraftUserPrompt,
@@ -271,6 +279,15 @@ describe("draft prompts", () => {
     }
   });
 
+  it("lets a researched revision keep the previous draft's cited figures without re-fetching them", () => {
+    const sentence = "When revising a previous draft, the figures and citations already in it count as checked";
+    const researched = draftSystemPrompt("researched");
+    expect(researched).toContain(sentence);
+    expect(researched).toContain("only a figure you add or change must come from a page you fetch");
+    expect(researched).toContain("dropping a source only when the revised page no longer uses it");
+    expect(draftSystemPrompt("placeholders")).not.toContain(sentence);
+  });
+
   it("carries the previous draft and the notes through a revision and keeps its mode", () => {
     const prompt = buildDraftUserPrompt({
       ...base,
@@ -416,6 +433,62 @@ describe("buildAnalysisUserPrompt", () => {
     expect(grouped.slice(s1, s2)).toContain("Day 1 sample 1 text");
     expect(grouped.slice(s3, day2)).toContain("Day 1 sample 3 text");
     expect(grouped).toContain("None. Google cited no pages");
+  });
+});
+
+type MessageContent = Anthropic.Beta.BetaMessage["content"];
+
+describe("finalText", () => {
+  it("joins the trailing text blocks that web-search citations split the answer into, without the preamble", () => {
+    const content = [
+      { type: "text", text: "I'll check the free-plan limit first.", citations: null },
+      { type: "server_tool_use", id: "srvtoolu_1", name: "web_search", input: { query: "typeform free plan limit" } },
+      { type: "web_search_tool_result", tool_use_id: "srvtoolu_1", content: [] },
+      { type: "text", text: '{"title":', citations: null },
+      {
+        type: "text",
+        text: '"10 responses a month",',
+        citations: [
+          {
+            type: "web_search_result_location",
+            url: "https://www.typeform.com/pricing/",
+            title: "Typeform pricing",
+            encrypted_index: "abc",
+            cited_text: "10 responses a month",
+          },
+        ],
+      },
+      { type: "text", text: '"sources":[]}', citations: null },
+    ] as unknown as MessageContent;
+    const text = finalText({ content });
+    expect(text).toBe('{"title":"10 responses a month","sources":[]}');
+    expect(JSON.parse(text)).toEqual({ title: "10 responses a month", sources: [] });
+  });
+
+  it("is the one text block on the grammar path", () => {
+    const content = [
+      { type: "thinking", thinking: "", signature: "sig" },
+      { type: "text", text: '{"title":"x"}', citations: null },
+    ] as unknown as MessageContent;
+    expect(finalText({ content })).toBe('{"title":"x"}');
+  });
+
+  it("throws when the answer ends without text", () => {
+    const content = [
+      { type: "text", text: "Fetching the page.", citations: null },
+      { type: "server_tool_use", id: "srvtoolu_1", name: "web_fetch", input: { url: "https://a.com/" } },
+    ] as unknown as MessageContent;
+    expect(() => finalText({ content })).toThrow("Claude returned no text");
+  });
+});
+
+describe("jsonObjectIn", () => {
+  it("drops prose around the object on the no-grammar path and leaves plain JSON alone", () => {
+    expect(jsonObjectIn('Here is the page:\n{"title":"x","sources":[]}\nLet me know if you want changes.')).toBe(
+      '{"title":"x","sources":[]}',
+    );
+    expect(jsonObjectIn('{"a":{"b":"}"}}')).toBe('{"a":{"b":"}"}}');
+    expect(jsonObjectIn("no object here")).toBe("no object here");
   });
 });
 

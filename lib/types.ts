@@ -174,6 +174,8 @@ export interface Analysis {
   /** How many samples / distinct days the report was built from (null on rows from before sampling). */
   samples_total: number | null;
   days_total: number | null;
+  /** Set while a draft for this report is being written (claim with a 15-minute TTL); null otherwise. */
+  draft_started_at: string | null;
   usage: unknown;
   error: string | null;
 }

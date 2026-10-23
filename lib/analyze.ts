@@ -28,6 +28,14 @@ export class AnalysisInProgressError extends Error {
   }
 }
 
+/** Thrown when a draft is already being written for the tracker's report. */
+export class DraftInProgressError extends Error {
+  constructor() {
+    super("Your page is already being written. Give it a minute.");
+    this.name = "DraftInProgressError";
+  }
+}
+
 function errorMessage(err: unknown): string {
   return err instanceof Error ? err.message : String(err);
 }
@@ -259,11 +267,33 @@ export async function runAnalysis(trackerId: string): Promise<Analysis> {
 }
 
 /**
+ * A draft claim (analyses.draft_started_at) older than this is considered
+ * abandoned: the platform stopped the function before it could release it.
+ * Longer than the route's and the cron's maxDuration (800 s).
+ */
+export const STALE_DRAFT_MS = 15 * 60 * 1000;
+
+/** True while a draft is being written for the report (a claim younger than STALE_DRAFT_MS). Pure. */
+export function isDraftWriting(
+  analysis: { draft_started_at?: string | null } | null,
+  now = Date.now(),
+): boolean {
+  const startedAt = analysis?.draft_started_at;
+  if (!startedAt) return false;
+  const started = Date.parse(startedAt);
+  return Number.isFinite(started) && now - started < STALE_DRAFT_MS;
+}
+
+/**
  * Write a draft of one mode from the latest finished analysis. With `notes`,
  * revises the latest draft of that same mode and analysis; otherwise writes a
  * fresh page (a draft left over from an older analysis is not reused). A
  * researched draft (the default) searches the web for its figures and cites
  * them; a placeholders draft leaves [ADD YOUR DATA: ...] marks for the author.
+ * Claims the report atomically (analyses.draft_started_at), so two callers
+ * (the cron and the keyword page, or two browser tabs) cannot pay for the same
+ * draft twice; the loser gets DraftInProgressError. A claim the platform never
+ * released is taken over after STALE_DRAFT_MS.
  * Returns the new drafts row.
  */
 export async function regenerateDraft(
@@ -292,6 +322,19 @@ export async function regenerateDraft(
   const previous = previousRow as Draft | null;
 
   const cleanNotes = notes?.trim() ? notes.trim() : null;
+
+  // One claim per report serializes both modes and notes revisions too, which
+  // matches the UI (both buttons are disabled while any draft is written).
+  const cutoff = new Date(Date.now() - STALE_DRAFT_MS).toISOString();
+  const { data: claimed, error: claimError } = await admin
+    .from("analyses")
+    .update({ draft_started_at: new Date().toISOString() })
+    .eq("id", analysis.id)
+    .or(`draft_started_at.is.null,draft_started_at.lt.${cutoff}`)
+    .select("id");
+  if (claimError) throw new Error(claimError.message);
+  if (!claimed?.length) throw new DraftInProgressError();
+
   const startedAt = Date.now();
 
   try {
@@ -355,6 +398,14 @@ export async function regenerateDraft(
       error: errorMessage(err),
     });
     throw err;
+  } finally {
+    // Release the claim whatever happened. A function the platform killed never
+    // gets here; its claim expires after STALE_DRAFT_MS instead.
+    const { error: releaseError } = await admin
+      .from("analyses")
+      .update({ draft_started_at: null })
+      .eq("id", analysis.id);
+    if (releaseError) console.warn("draft claim release failed", releaseError.message);
   }
 }
 

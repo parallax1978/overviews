@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { recoverStaleAnalysis, regenerateDraft } from "@/lib/analyze";
+import { DraftInProgressError, recoverStaleAnalysis, regenerateDraft } from "@/lib/analyze";
 import { getUser } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import type { Tracker } from "@/lib/types";
@@ -33,7 +33,7 @@ async function readBody(request: Request): Promise<z.infer<typeof BodySchema> | 
 /**
  * POST /api/trackers/[id]/draft: write a new draft of one mode (body `mode`,
  * default "researched"), optionally revised with the caller's `notes`.
- * Responds { draftId, mode }.
+ * Responds { draftId, mode }, or 409 while a draft is already being written.
  */
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -93,6 +93,8 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     const draft = await regenerateDraft(id, body.notes ?? null, body.mode ?? "researched");
     return NextResponse.json({ draftId: draft.id, mode: draft.mode });
   } catch (err) {
+    // Another request (the daily job, or another tab) is writing this page; the keyword page shows its progress.
+    if (err instanceof DraftInProgressError) return NextResponse.json({ error: err.message }, { status: 409 });
     const message = err instanceof Error ? err.message : "Something went wrong writing your draft.";
     return NextResponse.json({ error: message }, { status: 500 });
   }

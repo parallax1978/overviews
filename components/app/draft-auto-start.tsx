@@ -6,13 +6,8 @@ import { LoaderCircle, RefreshCw, TriangleAlert } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Eyebrow } from "@/components/ui/eyebrow";
+import { markFailed, markStarted, readMarker, type MarkerStorage } from "@/components/app/draft-marker";
 
-/**
- * A draft request started this long ago in this browser tab counts as lost,
- * so a later visit starts a new one. Longer than the route's maxDuration
- * (800 s), so a request that is still running is never started over.
- */
-const STARTED_TTL_MS = 15 * 60 * 1000;
 /** How often to look for the draft while a request started earlier in this tab is still running. */
 const POLL_MS = 5000;
 
@@ -25,14 +20,15 @@ export interface DraftAutoStartProps {
 }
 
 /**
- * Shown in place of the draft when the report is done but its ready-to-publish
- * page was never written (the function that writes both was stopped in between,
- * or the report predates the researched version). Starts that version once on
- * mount, then refreshes the page so the draft shows up.
+ * Shown in the ready-to-publish pane of the Draft tab when the report is done
+ * but that page was never written (the function that writes both was stopped
+ * in between, or the report predates the researched version). Starts that
+ * version once on mount, then refreshes the page so the draft shows up.
  * A sessionStorage marker, keyed by the report, keeps a reload, or the other
  * tabs of the keyword page, from starting a second draft while the first one
- * is still running. The marker stays after a success (it expires on its own),
- * so a missing marker only ever means a request in this tab failed.
+ * is still running, and from paying for another attempt after one failed:
+ * a failed marker only shows the error, and Try again starts over. The marker
+ * stays after a success (it expires on its own).
  */
 export function DraftAutoStart({ trackerId, analysisId, silent = false }: DraftAutoStartProps) {
   const router = useRouter();
@@ -41,16 +37,24 @@ export function DraftAutoStart({ trackerId, analysisId, silent = false }: DraftA
   const storageKey = `draft-auto-${trackerId}-${analysisId}`;
 
   const start = useCallback(async () => {
-    writeStartedAt(storageKey, Date.now());
+    markStarted(tabStorage(), storageKey, Date.now());
     try {
       const response = await fetch(`/api/trackers/${trackerId}/draft`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ mode: "researched" }),
       });
+      if (response.status === 409) {
+        // Another request (the cron, another tab) is already writing this draft: keep the
+        // marker and let the refreshed page show the server's "writing" state.
+        router.refresh();
+        return;
+      }
       if (!response.ok) {
-        clearStartedAt(storageKey);
-        setError(await readError(response));
+        // Remember the failure: every later mount in this tab shows it instead of paying again.
+        const message = await readError(response);
+        markFailed(tabStorage(), storageKey, message);
+        setError(message);
         return;
       }
       // The draft is written. Keep the marker: a poller in another mount of this page
@@ -63,29 +67,42 @@ export function DraftAutoStart({ trackerId, analysisId, silent = false }: DraftA
     }
   }, [router, storageKey, trackerId]);
 
+  /** Picks up where this tab left off: shows an earlier failure, waits for a running request, or starts one. */
+  const resume = useCallback(async () => {
+    const marker = readMarker(tabStorage(), storageKey, Date.now());
+    if (marker.state === "failed") {
+      setError(marker.error);
+      return;
+    }
+    if (marker.state === "none") {
+      await start();
+    }
+  }, [start, storageKey]);
+
   useEffect(() => {
-    const startedAt = readStartedAt(storageKey);
-    if (startedAt == null || Date.now() - startedAt >= STARTED_TTL_MS) {
+    const marker = readMarker(tabStorage(), storageKey, Date.now());
+    if (marker.state !== "running") {
       if (!started.current) {
         started.current = true;
-        void start();
+        void resume();
       }
       return;
     }
     // A request started earlier in this tab (before a reload, or from another tab of
-    // this page) is running or has just finished: wait for its draft. Start over only
-    // when that request failed (it cleared the marker) or never landed (marker expired).
+    // this page) is running or has just finished: wait for its draft. Stop when that
+    // request failed (it marked the failure); start over only when it never landed
+    // (the marker expired).
     const timer = setInterval(() => {
-      const at = readStartedAt(storageKey);
-      if (at == null || Date.now() - at >= STARTED_TTL_MS) {
-        clearInterval(timer);
-        void start();
-      } else {
+      const current = readMarker(tabStorage(), storageKey, Date.now());
+      if (current.state === "running") {
         router.refresh();
+        return;
       }
+      clearInterval(timer);
+      void resume();
     }, POLL_MS);
     return () => clearInterval(timer);
-  }, [router, start, storageKey]);
+  }, [resume, router, storageKey]);
 
   if (silent) return null;
 
@@ -105,6 +122,7 @@ export function DraftAutoStart({ trackerId, analysisId, silent = false }: DraftA
             size="sm"
             onClick={() => {
               setError(null);
+              // Starting over replaces the failed marker with a fresh one.
               void start();
             }}
           >
@@ -116,6 +134,11 @@ export function DraftAutoStart({ trackerId, analysisId, silent = false }: DraftA
     );
   }
 
+  return <DraftPendingCard />;
+}
+
+/** The "writing your page" card, also shown when the server reports a draft in progress elsewhere. */
+export function DraftPendingCard() {
   return (
     <Card>
       <Eyebrow>Draft</Eyebrow>
@@ -137,29 +160,12 @@ export function DraftAutoStart({ trackerId, analysisId, silent = false }: DraftA
 
 // ---------------------------------------------------------------------------
 
-function readStartedAt(key: string): number | null {
+/** This browser tab's storage, or null where it is blocked (private mode, a sandboxed frame). */
+function tabStorage(): MarkerStorage | null {
   try {
-    const raw = sessionStorage.getItem(key);
-    const value = raw ? Number(raw) : NaN;
-    return Number.isFinite(value) ? value : null;
+    return window.sessionStorage;
   } catch {
     return null;
-  }
-}
-
-function writeStartedAt(key: string, at: number): void {
-  try {
-    sessionStorage.setItem(key, String(at));
-  } catch {
-    // Storage blocked (private mode, quota): the ref guard still stops a second request in this mount.
-  }
-}
-
-function clearStartedAt(key: string): void {
-  try {
-    sessionStorage.removeItem(key);
-  } catch {
-    // Nothing to clear.
   }
 }
 
