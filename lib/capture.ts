@@ -6,7 +6,7 @@
  * (server actions) or be the secret-protected cron.
  */
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { regenerateDraft, runAnalysis } from "@/lib/analyze";
+import { recoverStaleAnalysis, regenerateDraft, runAnalysis } from "@/lib/analyze";
 import { logApiCall } from "@/lib/api-log";
 import {
   type CaptureResult,
@@ -25,18 +25,26 @@ const UNIQUE_VIOLATION = "23505";
 const DEFAULT_LIMIT = 200;
 const DEFAULT_CONCURRENCY = 4;
 /**
- * Stop starting new captures after this long so the 300s function returns cleanly.
+ * The cron function has 800s (app/api/cron/capture/route.ts). Stop starting
+ * new captures after this long so the reports below still fit in the rest.
  * A tracker takes about 20s: its samples run in parallel.
  */
 const CAPTURE_BUDGET_MS = 240_000;
-/** Only start a report (about 3 minutes) while this much of the function's time is still unused. */
-const ANALYSIS_START_BUDGET_MS = 60_000;
-/** Also write the draft (about 2 minutes) only when the report finished early enough. */
-const DRAFT_START_BUDGET_MS = 90_000;
+/** Only start a report (about 3 minutes) while no more than this much of the function's time is used. */
+const ANALYSIS_START_BUDGET_MS = 150_000;
+/**
+ * Also write the ready-to-publish draft (up to about 6 minutes: it searches
+ * the web and reads pages) only when the report finished early enough.
+ */
+const DRAFT_START_BUDGET_MS = 300_000;
 /** Reports to pick up per run for trackers that reached their target earlier but were never analyzed. */
 const PENDING_REPORTS_PER_RUN = 1;
+/** Stuck "analyzing" trackers to check per run; each check is a few quick queries. */
+const STUCK_ANALYSES_PER_RUN = 50;
 
 export interface CaptureRunSummary {
+  /** Trackers that were stuck in "analyzing" from a stopped run and were put back to a resting state. */
+  recovered: string[];
   captured: string[];
   failed: { trackerId: string; error: string }[];
   analyzed: string[];
@@ -96,10 +104,11 @@ export async function captureSnapshot(
 }
 
 /**
- * Captures every tracker that is due today, four at a time (each tracker's
- * samples run in parallel, about 20s per tracker), then builds the report for
- * trackers that just reached their day target (one at a time, while the
- * function still has time). Reports it could not start are built when the
+ * First puts back any tracker left stuck in "analyzing" by a run the platform
+ * stopped, then captures every tracker that is due today, four at a time (each
+ * tracker's samples run in parallel, about 20s per tracker), then builds the
+ * report for trackers that just reached their day target (one at a time, while
+ * the function still has time). Reports it could not start are built when the
  * user next opens the keyword page.
  */
 export async function runDueCaptures(opts?: {
@@ -112,6 +121,24 @@ export async function runDueCaptures(opts?: {
   const concurrency = Math.max(1, opts?.concurrency ?? DEFAULT_CONCURRENCY);
   const admin = createAdminClient();
 
+  const summary: CaptureRunSummary = { recovered: [], captured: [], failed: [], analyzed: [], analysisFailed: [] };
+  const startedAt = Date.now();
+  const elapsed = () => Date.now() - startedAt;
+
+  // A report the platform stopped mid-run (the function hit its time limit)
+  // leaves its keyword "analyzing" for good: nothing touches it again unless
+  // the user opens its page. Put those back first, before the due query, so a
+  // recovered keyword can still be captured and queued for a report today.
+  // Best effort: recoverStaleAnalysis leaves a report that is really running alone.
+  for (const trackerId of await loadAnalyzingTrackers(admin, STUCK_ANALYSES_PER_RUN)) {
+    try {
+      const { recovered } = await recoverStaleAnalysis(trackerId);
+      if (recovered) summary.recovered.push(trackerId);
+    } catch (err) {
+      console.error(`stale analysis recovery failed for ${trackerId}:`, shortErrorMessage(err));
+    }
+  }
+
   const { data, error } = await admin
     .from("trackers")
     .select("id, status, keep_tracking, day_count, days_target, next_capture_at")
@@ -123,10 +150,6 @@ export async function runDueCaptures(opts?: {
 
   type DueRow = Pick<Tracker, "id" | "status" | "keep_tracking" | "day_count" | "days_target" | "next_capture_at">;
   const due = ((data ?? []) as DueRow[]).filter((t) => isCaptureDue(t, now));
-
-  const summary: CaptureRunSummary = { captured: [], failed: [], analyzed: [], analysisFailed: [] };
-  const startedAt = Date.now();
-  const elapsed = () => Date.now() - startedAt;
 
   // Reports owed from earlier runs: trackers at their target, with an overview, that were never analyzed.
   const pending = await loadPendingReports(admin, PENDING_REPORTS_PER_RUN);
@@ -167,7 +190,7 @@ export async function runDueCaptures(opts?: {
     try {
       await runAnalysis(trackerId);
       summary.analyzed.push(trackerId);
-      if (elapsed() < DRAFT_START_BUDGET_MS) await regenerateDraft(trackerId, null);
+      if (elapsed() < DRAFT_START_BUDGET_MS) await regenerateDraft(trackerId, null, "researched");
     } catch (err) {
       summary.analysisFailed.push({ trackerId, error: shortErrorMessage(err) });
     }
@@ -233,6 +256,16 @@ async function loadSample(
     .maybeSingle();
   if (error) throw new Error(`Could not load snapshot: ${error.message}`);
   return (data as Snapshot | null) ?? null;
+}
+
+/** Trackers marked "analyzing". recoverStaleAnalysis decides which of them are really stuck. */
+async function loadAnalyzingTrackers(admin: SupabaseClient, limit: number): Promise<string[]> {
+  const { data, error } = await admin.from("trackers").select("id").eq("status", "analyzing").limit(limit);
+  if (error) {
+    console.error("analyzing trackers query failed", error.message);
+    return [];
+  }
+  return ((data ?? []) as { id: string }[]).map((r) => r.id);
 }
 
 /**

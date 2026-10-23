@@ -1,8 +1,9 @@
 /**
  * The two Claude calls: analyze the captured AI Overviews (with web_fetch on
- * the most-cited pages) and write the page. Both stream, use adaptive
- * thinking, server-side refusal fallbacks and structured outputs, and
- * validate the JSON with zod before anything is stored.
+ * the most-cited pages) and write the page (with web_search and web_fetch when
+ * the draft is researched). Both stream, use adaptive thinking, server-side
+ * refusal fallbacks and structured outputs, and validate the JSON with zod
+ * before anything is stored.
  */
 
 import Anthropic from "@anthropic-ai/sdk";
@@ -12,15 +13,15 @@ import { serverEnv } from "@/lib/env";
 import { domainFromUrl, pluralize } from "@/lib/utils";
 import {
   ANALYSIS_SYSTEM_PROMPT,
-  DRAFT_SYSTEM_PROMPT,
   buildAnalysisUserPrompt,
   buildDraftUserPrompt,
+  draftSystemPrompt,
   type AnalysisInput,
   type AnalysisSnapshotInput,
   type CandidateUrl,
   type DraftInput,
 } from "@/lib/prompts";
-import type { AnalysisPatterns, CitationResearchItem, PageBlueprint } from "@/lib/types";
+import type { AnalysisPatterns, CitationResearchItem, DraftSource, PageBlueprint } from "@/lib/types";
 
 export type { AnalysisInput, AnalysisSnapshotInput, CandidateUrl, DraftInput } from "@/lib/prompts";
 
@@ -28,10 +29,16 @@ export const CLAUDE_MODEL = "claude-opus-5-5";
 /** How many of the most-cited pages the analysis call is asked to fetch. */
 export const MAX_FETCH_CANDIDATES = 8;
 
+/** How many web searches and page fetches a researched draft may spend on its figures. */
+export const DRAFT_MAX_SEARCHES = 10;
+export const DRAFT_MAX_FETCHES = 10;
+/** Web search list price: $10 per 1,000 searches. Web fetch is free. */
+export const WEB_SEARCH_COST_USD = 0.01;
+
 const FALLBACK_BETA = "server-side-fallback-2026-07-01";
 const ANALYSIS_MAX_TOKENS = 32000;
 const DRAFT_MAX_TOKENS = 32000;
-/** Server tools pause the turn after ~10 fetches; we resume this many times at most. */
+/** Server tools pause the turn after ~10 tool iterations; we resume this many times at most. */
 const MAX_PAUSE_RESUMES = 3;
 
 let client: Anthropic | null = null;
@@ -137,7 +144,13 @@ export const AnalysisSchema = z.object({
   summary_md: z.string(),
 });
 
-/** Structured output of the draft call. */
+export const DraftSourceSchema = z.object({
+  url: z.string(),
+  title: z.string(),
+  used_for: z.string(),
+}) satisfies z.ZodType<DraftSource>;
+
+/** Structured output of the draft call. `sources` is empty for a placeholders draft. */
 export const DraftSchema = z.object({
   title: z.string(),
   meta_description: z.string(),
@@ -145,6 +158,7 @@ export const DraftSchema = z.object({
   outline: z.array(z.object({ heading: z.string(), summary: z.string() })),
   content_md: z.string(),
   why_better_md: z.string(),
+  sources: z.array(DraftSourceSchema),
 });
 
 export type AnalysisOutput = z.infer<typeof AnalysisSchema> & {
@@ -291,6 +305,7 @@ function parseOutput<S extends z.ZodType>(message: BetaMessage, schema: S): z.in
 }
 
 function sumUsage(total: Anthropic.Beta.BetaUsage, next: Anthropic.Beta.BetaUsage): Anthropic.Beta.BetaUsage {
+  const tools = total.server_tool_use || next.server_tool_use;
   return {
     ...next,
     input_tokens: total.input_tokens + next.input_tokens,
@@ -298,7 +313,37 @@ function sumUsage(total: Anthropic.Beta.BetaUsage, next: Anthropic.Beta.BetaUsag
     cache_creation_input_tokens:
       (total.cache_creation_input_tokens ?? 0) + (next.cache_creation_input_tokens ?? 0),
     cache_read_input_tokens: (total.cache_read_input_tokens ?? 0) + (next.cache_read_input_tokens ?? 0),
+    // Tool counts arrive per response; a resumed turn must keep the earlier ones.
+    server_tool_use: tools
+      ? {
+          web_search_requests:
+            (total.server_tool_use?.web_search_requests ?? 0) + (next.server_tool_use?.web_search_requests ?? 0),
+          web_fetch_requests:
+            (total.server_tool_use?.web_fetch_requests ?? 0) + (next.server_tool_use?.web_fetch_requests ?? 0),
+        }
+      : null,
   };
+}
+
+/** Dollar cost of the web searches in a usage block (fetches are free). Token costs are estimated elsewhere. */
+export function webSearchCost(usage: { server_tool_use?: { web_search_requests?: number | null } | null } | null | undefined): number {
+  const searches = usage?.server_tool_use?.web_search_requests ?? 0;
+  return Math.round(searches * WEB_SEARCH_COST_USD * 1_000_000) / 1_000_000;
+}
+
+/** The web_fetch server tool, capped per call. Both Claude calls read pages with it. */
+function webFetchTool(opts: { maxUses: number; maxContentTokens: number }): Anthropic.Beta.BetaWebFetchTool20260209 {
+  return {
+    type: "web_fetch_20260209",
+    name: "web_fetch",
+    max_uses: opts.maxUses,
+    max_content_tokens: opts.maxContentTokens,
+  };
+}
+
+/** The web_search server tool, capped per call. Only a researched draft searches. */
+function webSearchTool(opts: { maxUses: number }): Anthropic.Beta.BetaWebSearchTool20260209 {
+  return { type: "web_search_20260209", name: "web_search", max_uses: opts.maxUses };
 }
 
 /**
@@ -396,14 +441,7 @@ export async function analyzeOverviews(input: AnalysisInput, hooks: AnalysisHook
     userPrompt: buildAnalysisUserPrompt(input, candidates),
     schema: AnalysisSchema,
     maxTokens: ANALYSIS_MAX_TOKENS,
-    tools: [
-      {
-        type: "web_fetch_20260209",
-        name: "web_fetch",
-        max_uses: MAX_FETCH_CANDIDATES,
-        max_content_tokens: 12000,
-      },
-    ],
+    tools: [webFetchTool({ maxUses: MAX_FETCH_CANDIDATES, maxContentTokens: 12000 })],
     onBlockStart: (block) => {
       if (block.type === "server_tool_use") void report(1);
       else if (block.type === "text") void report(2);
@@ -419,13 +457,28 @@ export async function analyzeOverviews(input: AnalysisInput, hooks: AnalysisHook
 // Call 2: draft
 // ---------------------------------------------------------------------------
 
-/** Write (or, with notes and a previous draft, revise) the page described by the blueprint. */
+/**
+ * Write (or, with notes and a previous draft, revise) the page described by
+ * the blueprint. A researched draft gets web_search and web_fetch so every
+ * figure comes from a page it read and is cited; a placeholders draft gets no
+ * tools and marks its figures [ADD YOUR DATA: ...] instead.
+ */
 export async function writeDraft(input: DraftInput): Promise<DraftOutput> {
+  const researched = input.mode === "researched";
   const { parsed, usage, model } = await runStructured({
-    system: DRAFT_SYSTEM_PROMPT,
+    system: draftSystemPrompt(input.mode),
     userPrompt: buildDraftUserPrompt(input),
     schema: DraftSchema,
     maxTokens: DRAFT_MAX_TOKENS,
+    ...(researched
+      ? {
+          tools: [
+            webSearchTool({ maxUses: DRAFT_MAX_SEARCHES }),
+            webFetchTool({ maxUses: DRAFT_MAX_FETCHES, maxContentTokens: 8000 }),
+          ],
+        }
+      : {}),
   });
-  return { ...parsed, usage, model };
+  // A placeholders draft cites nothing, whatever the model put in the field.
+  return { ...parsed, sources: researched ? parsed.sources : [], usage, model };
 }

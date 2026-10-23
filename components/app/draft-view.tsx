@@ -1,29 +1,68 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState } from "react";
-import { Check, Copy, Download, LoaderCircle, PenLine } from "lucide-react";
+import { useCallback, useRef, useState } from "react";
+import { Check, Copy, Download, ExternalLink, LoaderCircle, PenLine } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, Panel } from "@/components/ui/card";
 import { Eyebrow } from "@/components/ui/eyebrow";
 import { Markdown } from "@/components/ui/markdown";
-import type { Draft } from "@/lib/types";
+import type { Draft, DraftMode, DraftSource } from "@/lib/types";
+import { cn, domainFromUrl } from "@/lib/utils";
+
+/** The newest draft of each version for the current report; null when that version was never written. */
+export type DraftVersions = Record<DraftMode, Draft | null>;
 
 export interface DraftViewProps {
   trackerId: string;
   /** Used for the download file name. */
   keyword: string;
-  draft: Draft | null;
-  /** True once the report exists, so a new draft can be written. */
+  drafts: DraftVersions;
+  /** True once the report exists, so a version can be written or rewritten. */
   canRegenerate: boolean;
 }
+
+const MODES: DraftMode[] = ["researched", "placeholders"];
+
+const MODE_LABEL: Record<DraftMode, string> = {
+  researched: "Ready to publish",
+  placeholders: "With my own data",
+};
+
+/** One sentence under the switch that explains the selected version. */
+const MODE_HELP: Record<DraftMode, string> = {
+  researched: "Every number comes from a source we found, cited in the page. Copy it and publish.",
+  placeholders:
+    "Bold [ADD YOUR DATA: …] notes mark where your own data or experience goes. Fill them in before you publish.",
+};
+
+/** How long writing each version takes, shown next to the pending states. */
+const MODE_DURATION: Record<DraftMode, string> = {
+  researched: "Three to six minutes.",
+  placeholders: "A minute or two.",
+};
+
+/** Suffix on the downloaded file so the two versions do not overwrite each other. */
+const FILE_SUFFIX: Record<DraftMode, string> = {
+  researched: "ready",
+  placeholders: "with-your-data",
+};
 
 const PLACEHOLDER_RE = /\[ADD YOUR DATA:([^\]]*)\]/g;
 const NOTES_MAX = 2000;
 
-/** Draft tab: the written page with copy, download and "regenerate with notes". */
-export function DraftView({ trackerId, keyword, draft, canRegenerate }: DraftViewProps) {
-  if (!draft) {
+/**
+ * Draft tab: a switch between the two versions of the written page, then the
+ * selected one with copy, download and "regenerate with notes", or a card that
+ * writes it when that version does not exist yet. Both versions arrive from the
+ * server, so switching is instant.
+ */
+export function DraftView({ trackerId, keyword, drafts, canRegenerate }: DraftViewProps) {
+  const [mode, setMode] = useState<DraftMode>(() => defaultMode(drafts));
+  const writer = useDraftWriter(trackerId);
+  const draft = drafts[mode];
+
+  if (!drafts.researched && !drafts.placeholders && !canRegenerate) {
     return (
       <Card>
         <Eyebrow>Draft</Eyebrow>
@@ -37,19 +76,151 @@ export function DraftView({ trackerId, keyword, draft, canRegenerate }: DraftVie
     );
   }
 
-  const content = draft.content_md ?? "";
-  const placeholderCount = countPlaceholders(content);
-  const fullDocument = buildDocument(draft);
-
   return (
     <div className="space-y-5">
+      <div>
+        <ModeSwitch mode={mode} onChange={setMode} writing={writer.writing} />
+        <p className="mt-3 text-sm text-ink-muted">{MODE_HELP[mode]}</p>
+      </div>
+
+      {draft ? (
+        <DraftBody draft={draft} mode={mode} keyword={keyword} writer={writer} canRegenerate={canRegenerate} />
+      ) : (
+        <MissingVersion mode={mode} writer={writer} canRegenerate={canRegenerate} />
+      )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Writing a version
+
+interface DraftWriter {
+  /** The version being written right now, or null. */
+  writing: DraftMode | null;
+  error: { mode: DraftMode; message: string } | null;
+  clearError: () => void;
+  /** Asks the server for a new draft of `mode`; resolves true once it was written and the page refreshed. */
+  write: (mode: DraftMode, notes?: string) => Promise<boolean>;
+}
+
+/**
+ * One in-flight request for the whole tab, so a version that is being written
+ * keeps its pending state while the user looks at the other one, and the page
+ * still refreshes when it lands.
+ */
+function useDraftWriter(trackerId: string): DraftWriter {
+  const router = useRouter();
+  const inFlight = useRef(false);
+  const [writing, setWriting] = useState<DraftMode | null>(null);
+  const [error, setError] = useState<DraftWriter["error"]>(null);
+
+  const write = useCallback(
+    async (mode: DraftMode, notes = ""): Promise<boolean> => {
+      if (inFlight.current) return false;
+      inFlight.current = true;
+      setWriting(mode);
+      setError(null);
+      try {
+        const response = await fetch(`/api/trackers/${trackerId}/draft`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(notes ? { mode, notes } : { mode }),
+        });
+        if (!response.ok) {
+          setError({ mode, message: await readError(response) });
+          return false;
+        }
+        router.refresh();
+        return true;
+      } catch {
+        setError({
+          mode,
+          message: "We lost the connection. Refresh the page in a minute to see whether the new version arrived.",
+        });
+        return false;
+      } finally {
+        inFlight.current = false;
+        setWriting(null);
+      }
+    },
+    [router, trackerId],
+  );
+
+  const clearError = useCallback(() => setError(null), []);
+
+  return { writing, error, clearError, write };
+}
+
+// ---------------------------------------------------------------------------
+
+function ModeSwitch({
+  mode,
+  onChange,
+  writing,
+}: {
+  mode: DraftMode;
+  onChange: (mode: DraftMode) => void;
+  writing: DraftMode | null;
+}) {
+  return (
+    <div role="group" aria-label="Which version of the page to show" className="inline-flex rounded-full bg-surface-sunken p-1">
+      {MODES.map((option) => {
+        const selected = option === mode;
+        return (
+          <button
+            key={option}
+            type="button"
+            aria-pressed={selected}
+            onClick={() => onChange(option)}
+            className={cn(
+              "inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm font-semibold transition-[background-color,color,box-shadow] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-soft",
+              selected ? "bg-white text-ink shadow-sm" : "text-ink-muted hover:text-ink",
+            )}
+          >
+            {MODE_LABEL[option]}
+            {writing === option ? (
+              <LoaderCircle className="h-3.5 w-3.5 animate-spin text-brand" aria-label="Being written" />
+            ) : null}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+/** The selected version: toolbar, meta rows, the page, its sources and why it should win. */
+function DraftBody({
+  draft,
+  mode,
+  keyword,
+  writer,
+  canRegenerate,
+}: {
+  draft: Draft;
+  mode: DraftMode;
+  keyword: string;
+  writer: DraftWriter;
+  canRegenerate: boolean;
+}) {
+  const content = draft.content_md ?? "";
+  const placeholderCount = mode === "placeholders" ? countPlaceholders(content) : 0;
+  const fullDocument = buildDocument(draft);
+  const sources = mode === "researched" && Array.isArray(draft.sources) ? draft.sources : [];
+
+  return (
+    <>
       <div className="flex flex-wrap items-center gap-2">
         <CopyButton text={fullDocument} label="Copy the whole page" size="sm" />
-        <Button size="sm" variant="secondary" onClick={() => downloadMarkdown(fullDocument, `${slugify(keyword)}.md`)}>
+        <Button
+          size="sm"
+          variant="secondary"
+          onClick={() => downloadMarkdown(fullDocument, `${slugify(keyword)}-${FILE_SUFFIX[mode]}.md`)}
+        >
           <Download className="h-4 w-4" aria-hidden="true" />
           Download .md
         </Button>
-        {canRegenerate ? <RegenerateForm trackerId={trackerId} /> : null}
+        {canRegenerate ? <RegenerateForm mode={mode} writer={writer} /> : null}
       </div>
 
       <Panel className="divide-y divide-line">
@@ -69,8 +240,10 @@ export function DraftView({ trackerId, keyword, draft, canRegenerate }: DraftVie
       ) : null}
 
       <Card>
-        <Markdown>{highlightPlaceholders(content)}</Markdown>
+        <Markdown>{mode === "placeholders" ? highlightPlaceholders(content) : content}</Markdown>
       </Card>
+
+      {sources.length > 0 ? <SourcesPanel sources={sources} /> : null}
 
       {draft.why_better_md ? (
         <section>
@@ -81,46 +254,90 @@ export function DraftView({ trackerId, keyword, draft, canRegenerate }: DraftVie
           </Card>
         </section>
       ) : null}
-    </div>
+    </>
   );
 }
 
-// ---------------------------------------------------------------------------
+/** Shown when the selected version was never written for this report. */
+function MissingVersion({
+  mode,
+  writer,
+  canRegenerate,
+}: {
+  mode: DraftMode;
+  writer: DraftWriter;
+  canRegenerate: boolean;
+}) {
+  const pending = writer.writing === mode;
+  const busy = writer.writing !== null;
+  const error = writer.error?.mode === mode ? writer.error.message : null;
 
-function RegenerateForm({ trackerId }: { trackerId: string }) {
-  const router = useRouter();
+  const title =
+    mode === "researched"
+      ? "The ready-to-publish version isn't written yet"
+      : "The version with your own data isn't written yet";
+  const body =
+    mode === "researched"
+      ? "We look up real numbers and sources on the web and write the full page with every figure cited, so there is nothing left to fill in."
+      : "We write the same page, but leave bold notes where your own prices, counts and experience belong.";
+
+  return (
+    <Card>
+      <Eyebrow>Draft</Eyebrow>
+      <h2 className="mt-2 text-xl font-bold tracking-tight text-ink">{title}</h2>
+      <p className="mt-2 text-sm text-ink-muted">{body}</p>
+      <div className="mt-5 flex flex-wrap items-center gap-3">
+        {canRegenerate ? (
+          <>
+            <Button size="sm" onClick={() => void writer.write(mode)} disabled={busy} aria-busy={pending}>
+              {pending ? (
+                <LoaderCircle className="h-4 w-4 animate-spin" aria-hidden="true" />
+              ) : (
+                <PenLine className="h-4 w-4" aria-hidden="true" />
+              )}
+              {pending ? "Writing…" : "Write this version"}
+            </Button>
+            <span className="text-xs text-ink-muted" aria-live="polite">
+              {pending ? `${MODE_DURATION[mode]} The page updates by itself.` : MODE_DURATION[mode]}
+            </span>
+          </>
+        ) : (
+          <p className="text-sm text-ink-muted">You can write it as soon as the report is done.</p>
+        )}
+      </div>
+      {error ? (
+        <p role="alert" className="mt-3 text-sm text-bad">
+          {error}
+        </p>
+      ) : null}
+    </Card>
+  );
+}
+
+function RegenerateForm({ mode, writer }: { mode: DraftMode; writer: DraftWriter }) {
   const [open, setOpen] = useState(false);
   const [notes, setNotes] = useState("");
-  const [pending, setPending] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const pending = writer.writing === mode;
+  const busy = writer.writing !== null;
+  const error = writer.error?.mode === mode ? writer.error.message : null;
 
   async function submit() {
-    if (pending) return;
-    setPending(true);
-    setError(null);
-    try {
-      const response = await fetch(`/api/trackers/${trackerId}/draft`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ notes: notes.trim() }),
-      });
-      if (!response.ok) {
-        setError(await readError(response));
-        return;
-      }
+    if (busy) return;
+    const written = await writer.write(mode, notes.trim());
+    if (written) {
       setOpen(false);
       setNotes("");
-      router.refresh();
-    } catch {
-      setError("We lost the connection. Refresh the page to see whether a new draft arrived.");
-    } finally {
-      setPending(false);
     }
+  }
+
+  function close() {
+    writer.clearError();
+    setOpen(false);
   }
 
   return (
     <>
-      <Button size="sm" variant="secondary" onClick={() => setOpen(true)} disabled={open}>
+      <Button size="sm" variant="secondary" onClick={() => setOpen(true)} disabled={open || busy}>
         <PenLine className="h-4 w-4" aria-hidden="true" />
         Regenerate
       </Button>
@@ -131,7 +348,7 @@ function RegenerateForm({ trackerId }: { trackerId: string }) {
           </label>
           <p className="mt-1 text-xs text-ink-muted">
             For example: &ldquo;shorter intro&rdquo;, &ldquo;add a pricing table&rdquo;, &ldquo;mention our free
-            plan&rdquo;. Leave it blank for a fresh take.
+            plan&rdquo;. Leave it blank for a fresh take. This rewrites the &ldquo;{MODE_LABEL[mode]}&rdquo; version.
           </p>
           <textarea
             id="draft-notes"
@@ -144,7 +361,7 @@ function RegenerateForm({ trackerId }: { trackerId: string }) {
             placeholder="What should be different this time?"
           />
           <div className="mt-3 flex flex-wrap items-center gap-2">
-            <Button size="sm" onClick={submit} disabled={pending} aria-busy={pending}>
+            <Button size="sm" onClick={submit} disabled={busy} aria-busy={pending}>
               {pending ? (
                 <LoaderCircle className="h-4 w-4 animate-spin" aria-hidden="true" />
               ) : (
@@ -152,10 +369,10 @@ function RegenerateForm({ trackerId }: { trackerId: string }) {
               )}
               {pending ? "Writing…" : "Write a new draft"}
             </Button>
-            <Button size="sm" variant="ghost" onClick={() => setOpen(false)} disabled={pending}>
+            <Button size="sm" variant="ghost" onClick={close} disabled={pending}>
               Cancel
             </Button>
-            {pending ? <span className="text-xs text-ink-muted">This takes a minute or two.</span> : null}
+            {pending ? <span className="text-xs text-ink-muted">{MODE_DURATION[mode]}</span> : null}
           </div>
           {error ? (
             <p role="alert" className="mt-2 text-sm text-bad">
@@ -165,6 +382,42 @@ function RegenerateForm({ trackerId }: { trackerId: string }) {
         </Panel>
       ) : null}
     </>
+  );
+}
+
+/** The pages a researched draft took its figures from. Each is also linked inside the page itself. */
+function SourcesPanel({ sources }: { sources: DraftSource[] }) {
+  return (
+    <section>
+      <Eyebrow>Sources</Eyebrow>
+      <h2 className="mt-1 text-xl font-bold tracking-tight text-ink">Where the numbers come from</h2>
+      <p className="mt-1 text-sm text-ink-muted">Each source is also linked inside the page.</p>
+      <Panel className="mt-4 divide-y divide-line">
+        {sources.map((source, index) => {
+          const domain = domainFromUrl(source.url);
+          const label = source.title?.trim() || domain;
+          return (
+            <div key={`${source.url}-${index}`} className="px-4 py-3">
+              {isHttpUrl(source.url) ? (
+                <a
+                  href={source.url}
+                  target="_blank"
+                  rel="nofollow noreferrer noopener"
+                  className="inline-flex items-center gap-1.5 font-medium text-ink hover:text-brand"
+                >
+                  {label}
+                  <ExternalLink className="h-3.5 w-3.5 shrink-0 text-ink-soft" aria-hidden="true" />
+                </a>
+              ) : (
+                <span className="font-medium text-ink">{label}</span>
+              )}
+              <p className="mt-0.5 text-xs text-ink-soft">{domain}</p>
+              {source.used_for ? <p className="mt-1 text-sm text-ink-muted">{source.used_for}</p> : null}
+            </div>
+          );
+        })}
+      </Panel>
+    </section>
   );
 }
 
@@ -219,6 +472,13 @@ function CopyButton({
 
 // ---------------------------------------------------------------------------
 
+/** The version to open with: the ready-to-publish one when it exists, else the other, else the ready one's card. */
+function defaultMode(drafts: DraftVersions): DraftMode {
+  if (drafts.researched) return "researched";
+  if (drafts.placeholders) return "placeholders";
+  return "researched";
+}
+
 /** Markdown document the user takes away: title line, meta description line, then the page body. */
 function buildDocument(draft: Draft): string {
   const lines = [
@@ -239,6 +499,10 @@ function highlightPlaceholders(content: string): string {
   return content.replace(PLACEHOLDER_RE, (match, _inner: string, offset: number, whole: string) =>
     whole.slice(Math.max(0, offset - 2), offset) === "**" ? match : `**${match}**`,
   );
+}
+
+function isHttpUrl(url: string): boolean {
+  return /^https?:\/\//i.test(url);
 }
 
 function slugify(text: string): string {

@@ -7,7 +7,14 @@ import { timingSafeEqual } from "node:crypto";
 import { runDueCaptures } from "@/lib/capture";
 import { serverEnv } from "@/lib/env";
 
-export const maxDuration = 300;
+/**
+ * 800s is the Vercel Pro ceiling, the same as the analyze and draft routes.
+ * The run also builds the day-7 report and its draft (several minutes each)
+ * for keywords that just finished; under a 300s limit the platform killed
+ * those mid-run and left the keyword stuck in "analyzing". lib/capture.ts
+ * budgets its captures and reports against this limit.
+ */
+export const maxDuration = 800;
 export const dynamic = "force-dynamic";
 
 function isAuthorized(request: Request): boolean {
@@ -32,6 +39,7 @@ export async function GET(request: Request) {
       ranAt: new Date(startedAt).toISOString(),
       durationMs: Date.now() - startedAt,
       counts: {
+        recovered: summary.recovered.length,
         captured: summary.captured.length,
         failed: summary.failed.length - skipped,
         skipped,

@@ -209,14 +209,18 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock("@/lib/supabase/admin", () => ({ createAdminClient: () => mocks.admin }));
-vi.mock("@/lib/analyze", () => ({ runAnalysis: vi.fn(), regenerateDraft: vi.fn() }));
+vi.mock("@/lib/analyze", () => ({
+  runAnalysis: vi.fn(),
+  regenerateDraft: vi.fn(),
+  recoverStaleAnalysis: vi.fn(async () => ({ recovered: false })),
+}));
 vi.mock("@/lib/dataforseo", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/lib/dataforseo")>();
   return { ...actual, fetchSerpWithAiOverview: mocks.fetchSerp };
 });
 
 const { captureSnapshot, runDueCaptures } = await import("@/lib/capture");
-const { runAnalysis } = await import("@/lib/analyze");
+const { recoverStaleAnalysis, runAnalysis } = await import("@/lib/analyze");
 
 const fixturesDir = path.join(path.dirname(fileURLToPath(import.meta.url)), "fixtures");
 const realFixture = path.join(fixturesDir, "dataforseo-ai-overview.real.json");
@@ -590,7 +594,7 @@ describe("runDueCaptures pending reports", () => {
     const summary = await runDueCaptures({ now });
 
     expect(runAnalysis).not.toHaveBeenCalled();
-    expect(summary).toEqual({ captured: [], failed: [], analyzed: [], analysisFailed: [] });
+    expect(summary).toEqual({ recovered: [], captured: [], failed: [], analyzed: [], analysisFailed: [] });
   });
 
   it("gives the pending slot to the oldest ready keyword that has an overview and no report", async () => {
@@ -618,5 +622,83 @@ describe("runDueCaptures pending reports", () => {
     expect(summary.analyzed).toEqual([WITH_OVERVIEW]);
     expect(summary.analysisFailed).toEqual([]);
     expect(summary.captured).toEqual([]);
+    expect(summary.recovered).toEqual([]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// runDueCaptures: keywords left stuck in "analyzing" by a run the platform stopped.
+// ---------------------------------------------------------------------------
+
+describe("runDueCaptures stuck reports", () => {
+  const now = new Date("2026-10-17T06:05:00Z");
+  const STUCK = "tracker-stuck";
+  const RUNNING = "tracker-running";
+
+  beforeEach(() => {
+    vi.mocked(runAnalysis).mockReset();
+    vi.mocked(recoverStaleAnalysis).mockReset();
+    mocks.fetchSerp.mockReset();
+    vi.spyOn(console, "error").mockImplementation(() => {});
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("puts a stuck keyword back before the due query, so it is captured today, and reports it", async () => {
+    const tables: Tables = {
+      trackers: [
+        // Day 3 of 7, capture due, but marked "analyzing" since a killed run a week ago.
+        tracker({ id: STUCK, status: "analyzing", day_count: 3 }),
+        // A report really in progress: recoverStaleAnalysis leaves it alone.
+        tracker({ id: RUNNING, status: "analyzing", day_count: 7 }),
+      ],
+      snapshots: [],
+      analyses: [],
+      api_log: [],
+    };
+    mocks.admin = fakeAdmin(tables);
+    // The staleness rule lives in recoverStaleAnalysis; here it recovers the first and not the second.
+    vi.mocked(recoverStaleAnalysis).mockImplementation(async (id) => {
+      const row = tables.trackers.find((t) => t.id === id);
+      if (id !== STUCK || !row) return { recovered: false };
+      row.status = "tracking";
+      return { recovered: true };
+    });
+    mocks.fetchSerp.mockResolvedValue(serp(overviewItem([A], dayOneText)));
+
+    const summary = await runDueCaptures({ now });
+
+    expect(recoverStaleAnalysis).toHaveBeenCalledTimes(2);
+    expect(recoverStaleAnalysis).toHaveBeenCalledWith(STUCK);
+    expect(recoverStaleAnalysis).toHaveBeenCalledWith(RUNNING);
+    expect(summary.recovered).toEqual([STUCK]);
+
+    // Recovered to "tracking" and due, so the same run captured its day 4.
+    expect(summary.captured).toEqual([STUCK]);
+    expect(mocks.fetchSerp).toHaveBeenCalledTimes(SAMPLES_PER_DAY);
+    expect(tables.trackers.find((t) => t.id === STUCK)).toMatchObject({ status: "tracking", day_count: 4 });
+    expect(tables.trackers.find((t) => t.id === RUNNING)).toMatchObject({ status: "analyzing", day_count: 7 });
+    expect(runAnalysis).not.toHaveBeenCalled();
+  });
+
+  it("carries on with the run when a recovery check fails", async () => {
+    const tables: Tables = {
+      trackers: [tracker({ id: STUCK, status: "analyzing", day_count: 3 }), tracker({ id: "tracker-due", day_count: 1 })],
+      snapshots: [],
+      analyses: [],
+      api_log: [],
+    };
+    mocks.admin = fakeAdmin(tables);
+    vi.mocked(recoverStaleAnalysis).mockRejectedValue(new Error("database unavailable"));
+    mocks.fetchSerp.mockResolvedValue(serp(overviewItem([A], dayOneText)));
+
+    const summary = await runDueCaptures({ now });
+
+    expect(recoverStaleAnalysis).toHaveBeenCalledWith(STUCK);
+    expect(summary.recovered).toEqual([]);
+    expect(summary.captured).toEqual(["tracker-due"]);
+    expect(console.error).toHaveBeenCalledWith(expect.stringContaining(STUCK), "database unavailable");
   });
 });

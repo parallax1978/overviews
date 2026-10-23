@@ -52,7 +52,7 @@ const features = [
   {
     icon: PenLine,
     title: "Draft",
-    body: "A complete page written around the findings, with clear spots to add your own data and experience.",
+    body: "A complete page written around the findings, in two versions: ready to publish, with every number sourced, or with your own data.",
   },
 ];
 

@@ -11,11 +11,12 @@ import {
   CLAUDE_MODEL,
   analyzeOverviews,
   anthropicErrorStatus,
+  webSearchCost,
   writeDraft,
   type AnalysisSnapshotInput,
 } from "@/lib/claude";
 import { createAdminClient } from "@/lib/supabase/admin";
-import type { Analysis, Draft, Snapshot, Tracker, TrackerStatus } from "@/lib/types";
+import type { Analysis, Draft, DraftMode, Snapshot, Tracker, TrackerStatus } from "@/lib/types";
 
 type Admin = ReturnType<typeof createAdminClient>;
 
@@ -258,11 +259,18 @@ export async function runAnalysis(trackerId: string): Promise<Analysis> {
 }
 
 /**
- * Write a draft from the latest finished analysis. With `notes`, revises the
- * latest draft of that analysis; otherwise writes a fresh page (a draft left
- * over from an older analysis is not reused). Returns the new drafts row.
+ * Write a draft of one mode from the latest finished analysis. With `notes`,
+ * revises the latest draft of that same mode and analysis; otherwise writes a
+ * fresh page (a draft left over from an older analysis is not reused). A
+ * researched draft (the default) searches the web for its figures and cites
+ * them; a placeholders draft leaves [ADD YOUR DATA: ...] marks for the author.
+ * Returns the new drafts row.
  */
-export async function regenerateDraft(trackerId: string, notes?: string | null): Promise<Draft> {
+export async function regenerateDraft(
+  trackerId: string,
+  notes?: string | null,
+  mode: DraftMode = "researched",
+): Promise<Draft> {
   const admin = createAdminClient();
   const tracker = await loadTracker(admin, trackerId);
 
@@ -276,6 +284,7 @@ export async function regenerateDraft(trackerId: string, notes?: string | null):
     .select("*")
     .eq("tracker_id", trackerId)
     .eq("analysis_id", analysis.id)
+    .eq("mode", mode)
     .order("created_at", { ascending: false })
     .limit(1)
     .maybeSingle();
@@ -295,6 +304,7 @@ export async function regenerateDraft(trackerId: string, notes?: string | null):
       userEdge: tracker.user_edge,
       targetDomain: tracker.target_domain,
       competitorPolicy: tracker.competitor_policy ?? "avoid",
+      mode,
       notes: cleanNotes,
       previousDraft:
         cleanNotes && previous?.content_md
@@ -307,6 +317,8 @@ export async function regenerateDraft(trackerId: string, notes?: string | null):
       .insert({
         tracker_id: trackerId,
         analysis_id: analysis.id,
+        mode,
+        sources: mode === "researched" ? written.sources : null,
         title: written.title,
         meta_description: written.meta_description,
         h1: written.h1,
@@ -326,7 +338,8 @@ export async function regenerateDraft(trackerId: string, notes?: string | null):
       provider: "anthropic",
       endpoint: "messages:draft",
       status: 200,
-      cost_usd: estimateAnthropicCost(written.usage),
+      // Tokens plus the per-search fee a researched draft pays (fetches are free).
+      cost_usd: estimateAnthropicCost(written.usage) + webSearchCost(written.usage),
       duration_ms: Date.now() - startedAt,
     });
 
@@ -345,10 +358,10 @@ export async function regenerateDraft(trackerId: string, notes?: string | null):
   }
 }
 
-/** Report then draft, back to back. For scripts and callers with their own time budget. */
+/** Report then the ready-to-publish draft, back to back. For scripts and callers with their own time budget. */
 export async function runAnalysisAndDraft(trackerId: string): Promise<{ analysis: Analysis; draft: Draft }> {
   const analysis = await runAnalysis(trackerId);
-  const draft = await regenerateDraft(trackerId, null);
+  const draft = await regenerateDraft(trackerId, null, "researched");
   return { analysis, draft };
 }
 

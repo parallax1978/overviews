@@ -5,7 +5,7 @@ import { ArrowLeft, CircleCheck, Globe, TriangleAlert } from "lucide-react";
 import { AutoRefresh } from "@/components/app/auto-refresh";
 import { CitationsTable } from "@/components/app/citations-table";
 import { DraftAutoStart } from "@/components/app/draft-auto-start";
-import { DraftView } from "@/components/app/draft-view";
+import { DraftView, type DraftVersions } from "@/components/app/draft-view";
 import { ReportView } from "@/components/app/report-view";
 import { StatusChip } from "@/components/app/status-chip";
 import { Timeline } from "@/components/app/timeline";
@@ -15,7 +15,7 @@ import { isReportStale, recoverStaleAnalysis } from "@/lib/analyze";
 import { ReportAutoStart } from "@/components/app/report-auto-start";
 import { aggregateCitations, countTotals } from "@/lib/citations";
 import { createClient } from "@/lib/supabase/server";
-import { LANGUAGES, type Analysis, type Draft, type Snapshot, type Tracker } from "@/lib/types";
+import { LANGUAGES, type Analysis, type Draft, type DraftMode, type Snapshot, type Tracker } from "@/lib/types";
 import { Tabs, resolveTab } from "./tabs";
 
 export const dynamic = "force-dynamic";
@@ -27,6 +27,25 @@ type PageProps = {
 
 /** Postgres "invalid input syntax" (e.g. an id that is not a uuid): treat as not found. */
 const INVALID_TEXT_REPRESENTATION = "22P02";
+
+/** Enough recent drafts to find the newest of both versions for the current report. */
+const DRAFTS_TO_LOAD = 10;
+
+/**
+ * The newest draft of each version written for the given report, from rows
+ * ordered newest first. Drafts of older reports are ignored. Rows from before
+ * the two versions existed carry no mode and count as placeholder drafts.
+ */
+function latestDraftsFor(rows: Draft[], analysisId: string | null): DraftVersions {
+  const drafts: DraftVersions = { researched: null, placeholders: null };
+  if (!analysisId) return drafts;
+  for (const row of rows) {
+    if (row.analysis_id !== analysisId) continue;
+    const mode: DraftMode = row.mode === "researched" ? "researched" : "placeholders";
+    if (!drafts[mode]) drafts[mode] = row;
+  }
+  return drafts;
+}
 
 export async function generateMetadata({ params }: Pick<PageProps, "params">): Promise<Metadata> {
   const { id } = await params;
@@ -91,13 +110,13 @@ export default async function TrackerPage({ params, searchParams }: PageProps) {
       .order("created_at", { ascending: false })
       .limit(1)
       .maybeSingle(),
+    // The newest drafts, both versions: the keyword page shows the latest of each for the current report.
     supabase
       .from("drafts")
       .select("*")
       .eq("tracker_id", id)
       .order("created_at", { ascending: false })
-      .limit(1)
-      .maybeSingle(),
+      .limit(DRAFTS_TO_LOAD),
   ]);
   if (snapshotsRes.error) console.error("snapshots query failed", snapshotsRes.error.message);
   if (analysisRes.error) console.error("analysis query failed", analysisRes.error.message);
@@ -107,7 +126,7 @@ export default async function TrackerPage({ params, searchParams }: PageProps) {
   const snapshots = (snapshotsRes.data ?? []) as Snapshot[];
   const analysis = (analysisRes.data as Analysis | null) ?? null;
   const report = (reportRes.data as Analysis | null) ?? null;
-  const draft = (draftRes.data as Draft | null) ?? null;
+  const drafts = latestDraftsFor((draftRes.data ?? []) as Draft[], report?.id ?? null);
 
   const citationRows = aggregateCitations(snapshots);
   // Each day holds several samples (one snapshot row each); the report and the Citations tab count samples.
@@ -117,8 +136,9 @@ export default async function TrackerPage({ params, searchParams }: PageProps) {
   // A finished report exists and none is being built. A paused keyword keeps its report and stays paused.
   const hasReport = !analyzing && report !== null;
   const activeTab = resolveTab(tab, hasReport);
-  // The report is done but its page was never written (the function was stopped in between).
-  const needsDraft = !analyzing && report !== null && draft?.analysis_id !== report.id;
+  // The report is done but its ready-to-publish page was never written (the function was
+  // stopped in between, or the report predates that version): write it on open.
+  const needsDraft = !analyzing && report !== null && drafts.researched === null;
   // All days are in but no report was ever built (the cron ran out of time): build it on open.
   const needsReport = tracker.status === "ready" && !analysis && snapshotsWithOverview > 0;
   // A report exists but days were captured after it: offer a fresh one once all days are in.
@@ -211,12 +231,7 @@ export default async function TrackerPage({ params, searchParams }: PageProps) {
         ) : needsDraft ? (
           <DraftAutoStart trackerId={tracker.id} analysisId={report.id} />
         ) : (
-          <DraftView
-            trackerId={tracker.id}
-            keyword={tracker.keyword}
-            draft={draft}
-            canRegenerate={hasReport}
-          />
+          <DraftView trackerId={tracker.id} keyword={tracker.keyword} drafts={drafts} canRegenerate={hasReport} />
         )}
       </div>
     </div>

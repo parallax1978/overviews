@@ -7,6 +7,7 @@ import type {
   AnalysisPatterns,
   CitationResearchItem,
   CompetitorPolicy,
+  DraftMode,
   OverviewInlineLink,
   OverviewReference,
   PageBlueprint,
@@ -61,22 +62,33 @@ export interface DraftInput {
   userEdge: string | null;
   targetDomain: string | null;
   competitorPolicy: CompetitorPolicy;
+  /** "researched": figures come from the web and are cited. "placeholders": the author fills them in. */
+  mode: DraftMode;
   notes: string | null;
+  /** The draft being revised; it is always a draft of the same mode. */
   previousDraft: { title: string; content_md: string } | null;
 }
 
-/** The brand policy as a prompt paragraph, worded for whether the author gave a site or an edge. */
+/**
+ * The brand policy as a prompt paragraph, worded for whether the author gave a
+ * site or an edge. `allowPlaceholders` (default true) lets the text suggest a
+ * placeholder for the author's own offer; a researched draft may not hold one.
+ */
 export function competitorPolicyText(
   policy: CompetitorPolicy,
-  context: { hasSite: boolean; hasEdge: boolean } = { hasSite: false, hasEdge: false },
+  context: { hasSite: boolean; hasEdge: boolean; allowPlaceholders?: boolean } = { hasSite: false, hasEdge: false },
 ): string {
   if (policy === "compare") {
     return "The author wants a fair comparison page: other brands, products and companies may be named and compared honestly.";
   }
+  const ownOffer =
+    context.allowPlaceholders ?? true
+      ? "it gives the criteria instead and leaves a placeholder for the author's own offer."
+      : "it gives the criteria instead.";
   const positioning =
     context.hasSite || context.hasEdge
       ? "The page positions the author's own site, product or experience as the answer, honestly and with no invented claims, and otherwise answers in substance: what matters, what to check, what to avoid, what it costs."
-      : "No author site or product was given, so the page answers in substance only: what matters, what to check, what to avoid, what it costs. It does not invent an author product; where a recommendation would be needed, it gives the criteria instead and leaves a placeholder for the author's own offer.";
+      : `No author site or product was given, so the page answers in substance only: what matters, what to check, what to avoid, what it costs. It does not invent an author product; where a recommendation would be needed, ${ownOffer}`;
   return `Never recommend, rank, praise or link to other brands, products or companies. ${positioning} A competitor may be named only to quote what a source claims when settling a contradiction, neutrally.`;
 }
 
@@ -143,25 +155,49 @@ summary_md: a report in plain English for someone who is not an SEO expert. Unde
 ## How to beat them
 Short sentences. Quote every count as "in X of S samples", where S is the total number of samples captured. Add the day count only when it says something the sample count does not (for example a source cited in 6 samples that all fell on one day). Say once, in one short sentence, that Google gives a slightly different answer each time it is asked, which is why the report counts samples. Rank "Who Google keeps citing" by samples_cited, most cited first, and use real source names. "Where the cited pages fall short" names the gaps and contradictions with the pages responsible. "How to beat them" states the winning angle first, then the three or four moves that matter most, and ends with the single most important thing to do. No jargon: say "the sources Google cites" rather than "SERP features", and "the answer" rather than "the snippet". If the user's website was given, say whether it was cited in any sample.`;
 
-export const DRAFT_SYSTEM_PROMPT = `You are an expert writer. You produce the page described by a blueprint so it can earn a citation in Google's AI Overview for the target search. The page must be clearly better than every cited page, not a tidier copy of them.
+/**
+ * The rules every draft follows, whatever its mode. The mode block appended by
+ * draftSystemPrompt() says where figures come from: the web (researched) or the
+ * author ([ADD YOUR DATA: ...] placeholders).
+ */
+export const DRAFT_SHARED_RULES = `You are an expert writer. You produce the page described by a blueprint so it can earn a citation in Google's AI Overview for the target search. The page must be clearly better than every cited page, not a tidier copy of them.
 
 Rules
 1. Answer the target question in the first two sentences of the body, faster than the fastest cited page. No warm-up, no "In today's world". The opening paragraph must match the blueprint's opening_answer in substance.
-2. Build the page on the winning_angle. Fill every item in gaps_to_fill. Settle every item in contradictions_to_settle with checked facts; where a fact must be checked by the author, state the conflict plainly and add a placeholder for the checked figure.
+2. Build the page on the winning_angle. Fill every item in gaps_to_fill. Settle every item in contradictions_to_settle with checked facts; the draft mode rules below say where a checked fact comes from.
 3. Follow the blueprint's sections in order and use each section's format. When a section's format is "table", write a real Markdown table with a header row and a separator row. When it is "list", use a bulleted or numbered list. When it is "faq", write each question in bold followed by a short answer. Do not copy any cited page's outline or wording.
 4. Explain every term in terms_to_cover where it fits, naturally. Do not stuff them in.
 5. Brands: obey the brand policy in the user message exactly. brands_google_names is reference material, not a list to include.
-6. Never invent statistics, experience, testimonials, quotes, studies, prices or dates. Where original data or first-hand experience belongs (especially where the blueprint's something_new calls for it), write a visible placeholder in exactly this form: [ADD YOUR DATA: what to add]. Make each placeholder specific, for example [ADD YOUR DATA: how many of your customers switched in the last year]. Keep placeholders few and useful.
-7. If the author's edge is given, use it and present it as the author's own experience, data or product ("we", "our"). Do not add detail beyond what the edge says; where more detail is needed, use a placeholder.
+6. Never invent statistics, experience, testimonials, quotes, studies, prices or dates. The draft mode rules below say what to do where original data or first-hand experience belongs (especially where the blueprint's something_new calls for it).
+7. If the author's edge is given, use it and present it as the author's own experience, data or product ("we", "our"). Do not add detail beyond what the edge says; where more detail is needed, follow the draft mode rules.
 8. Length: 1,200 to 2,500 words, unless the typical length of the winning overviews and pages clearly suggests a shorter or longer page. Every paragraph must earn its place.
 9. Plain, confident, specific language. Short paragraphs. Headings that say what the section answers. No fluff intros and no "In conclusion".
 10. content_md starts with the H1 as a line beginning with "# " and uses "## " for the sections. Do not put the title or meta description inside content_md.
-11. outline: one entry per "## " heading in content_md, each with a one-sentence summary.
+11. outline: one entry per "## " heading in content_md, in order, each with a one-sentence summary.
 12. title: under 60 characters and containing the main phrase of the target question. meta_description: under 155 characters, stating the answer or the benefit plainly. h1: the title or a fuller version of it.
 13. why_better_md: a Markdown checklist (lines starting with "- [x] ") of how this page beats the top cited pages, named by domain: how much faster it answers, which gaps it fills, which contradictions it settles, what structure it has that they lack, what original element it adds. Be honest; never claim an advantage the draft does not have.
-14. When a previous draft and revision notes are given, revise that draft according to the notes. Keep everything the notes do not ask you to change.
+14. When a previous draft and revision notes are given, revise that draft according to the notes. Keep everything the notes do not ask you to change. The revision keeps the previous draft's mode: the same draft mode rules apply to it.`;
 
-Return one JSON object that follows the output schema exactly. No prose before or after it.`;
+/** The mode block of the draft system prompt: where every figure in the page comes from. */
+export const DRAFT_MODE_RULES: Record<DraftMode, string> = {
+  researched: `Draft mode: researched (ready to publish)
+You have web_search and web_fetch. Every number, price, date, percentage, count or named study in the page must come from a page you fetched (or a search result you read) during this task, and must be cited inline as a Markdown link right after the sentence that uses it, like ([Google Search Central](https://...)). Never write a placeholder of any kind: no [ADD YOUR DATA: ...], no "[insert ...]", no "TBD", no made-up "X%". Where the blueprint called for the author's own data, use the best public equivalent and say what it is, or leave that claim out; where a contradiction needs a checked fact, settle it with a source. Prefer official and neutral sources (Google documentation, studies, surveys, government or industry bodies, the author's own site); under the default brand policy a competitor's page may be cited only as a data source when nothing neutral exists, never as a recommendation. End content_md with a "## Sources" section listing each source once as a Markdown link with a few words on what it supports. "Sources" must be the last "## " heading in content_md and the last entry in outline. Fill the sources field with the same list (url, title, used_for), one entry per source, in the same order. Budget: at most 10 searches and 10 fetches; stop researching when the page's claims are covered.`,
+  placeholders: `Draft mode: placeholders (the author adds their own data)
+Do no research. Where original data or first-hand experience belongs (especially where the blueprint's something_new calls for it), where a contradiction needs a figure the author must check, or where the author's edge needs more detail than it gives, write a visible placeholder in exactly this form: [ADD YOUR DATA: what to add]. Make each placeholder specific, for example [ADD YOUR DATA: how many of your customers switched in the last year]. Keep placeholders few and useful. The sources field must be an empty array.`,
+};
+
+/** The full draft system prompt for one mode: shared rules, the mode block, then the output instruction. */
+export function draftSystemPrompt(mode: DraftMode): string {
+  return `${DRAFT_SHARED_RULES}\n\n${DRAFT_MODE_RULES[mode]}\n\nReturn one JSON object that follows the output schema exactly. No prose before or after it.`;
+}
+
+/** One line per mode for the user message, so the mode is visible next to the data as well as in the rules. */
+const DRAFT_MODE_SUMMARY: Record<DraftMode, string> = {
+  researched:
+    'researched ("Ready to publish"): every figure comes from a web page you fetched during this task and is cited inline, and the page holds no placeholders of any kind.',
+  placeholders:
+    'placeholders ("With my own data"): mark every spot that needs the author\'s own data with [ADD YOUR DATA: ...] and do no web research.',
+};
 
 function isoDay(iso: string): string {
   const date = new Date(iso);
@@ -350,6 +386,9 @@ export function buildDraftUserPrompt(input: DraftInput): string {
   const parts: string[] = [
     `Search to win: "${input.keyword}"`,
     "",
+    "## Draft mode",
+    DRAFT_MODE_SUMMARY[input.mode],
+    "",
     "## Blueprint",
     renderBlueprint(input.blueprint),
     "",
@@ -366,7 +405,13 @@ export function buildDraftUserPrompt(input: DraftInput): string {
   if (input.userEdge?.trim()) {
     parts.push("", "## The author's edge (present this as the author's own)", input.userEdge.trim());
   } else {
-    parts.push("", "## The author's edge", "None given. Use [ADD YOUR DATA: ...] placeholders where original data belongs.");
+    parts.push(
+      "",
+      "## The author's edge",
+      input.mode === "researched"
+        ? "None given. Where original data belongs, use the best public source and say what it is, or leave that claim out."
+        : "None given. Use [ADD YOUR DATA: ...] placeholders where original data belongs.",
+    );
   }
   if (input.targetDomain) {
     parts.push("", "## The author's website", input.targetDomain);
@@ -377,6 +422,7 @@ export function buildDraftUserPrompt(input: DraftInput): string {
     competitorPolicyText(input.competitorPolicy, {
       hasSite: Boolean(input.targetDomain),
       hasEdge: Boolean(input.userEdge?.trim()),
+      allowPlaceholders: input.mode === "placeholders",
     }),
   );
 
@@ -399,8 +445,8 @@ export function buildDraftUserPrompt(input: DraftInput): string {
     parts.push(
       "",
       input.notes?.trim()
-        ? "Revise the previous draft according to the revision notes. Keep everything the notes do not ask you to change, and return the complete revised page."
-        : "Write an improved version of the previous draft. Keep its strengths, fix its weaknesses against the blueprint, and return the complete page.",
+        ? "Revise the previous draft according to the revision notes. Keep everything the notes do not ask you to change, keep the draft mode, and return the complete revised page."
+        : "Write an improved version of the previous draft. Keep its strengths, fix its weaknesses against the blueprint, keep the draft mode, and return the complete page.",
     );
   } else {
     parts.push("", "Write the complete page now.");

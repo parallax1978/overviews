@@ -3,6 +3,11 @@
  * response, without touching the database. Use it to verify the Anthropic
  * integration end to end (costs about $0.50 to $0.80).
  *
+ * The draft is written in "placeholders" mode on purpose: this script has no
+ * database and exists to check the integration cheaply, so it skips the web
+ * searches and page fetches a "researched" draft would spend. Use
+ * scripts/run-analysis.ts --mode=researched on a real tracker for that.
+ *
  *   npx tsx scripts/analyze-fixture.ts [path/to/fixture.json]
  *
  * Reads ANTHROPIC_API_KEY (and optional ANTHROPIC_WORKSPACE_ID) from .env.local.
@@ -80,6 +85,7 @@ async function main() {
     userEdge: null,
     targetDomain: null,
     competitorPolicy: "avoid",
+    mode: "placeholders",
     notes: null,
     previousDraft: null,
   });

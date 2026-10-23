@@ -1,6 +1,13 @@
 import { describe, expect, it } from "vitest";
 import { AnalysisSchema, DraftSchema, rankCandidateUrls } from "@/lib/claude";
-import { buildAnalysisUserPrompt, type AnalysisInput, type CandidateUrl } from "@/lib/prompts";
+import {
+  buildAnalysisUserPrompt,
+  buildDraftUserPrompt,
+  draftSystemPrompt,
+  type AnalysisInput,
+  type CandidateUrl,
+  type DraftInput,
+} from "@/lib/prompts";
 import type { OverviewReference } from "@/lib/types";
 
 function ref(url: string, title = "Page"): OverviewReference {
@@ -103,13 +110,35 @@ const sampleAnalysis = {
   summary_md: "## What Google keeps saying\nTypeform leads in 18 of 21 samples.",
 };
 
+// A placeholders draft: the author's own figures are marked, nothing is cited.
 const sampleDraft = {
   title: "Best Form Builder in 2026",
   meta_description: "Typeform is the best form builder for most teams. Here is why.",
   h1: "The Best Form Builder in 2026",
   outline: [{ heading: "Quick answer", summary: "Typeform wins for most teams." }],
-  content_md: "# The Best Form Builder in 2026\n\nTypeform is the best form builder for most teams.",
+  content_md:
+    "# The Best Form Builder in 2026\n\nTypeform is the best form builder for most teams. [ADD YOUR DATA: how many forms you tested]",
   why_better_md: "- [x] Answers in the first sentence",
+  sources: [],
+};
+
+// A researched draft: every figure is cited inline and listed once under Sources.
+const researchedDraft = {
+  ...sampleDraft,
+  outline: [
+    { heading: "Quick answer", summary: "Typeform wins for most teams." },
+    { heading: "Sources", summary: "The two pages the figures come from." },
+  ],
+  content_md:
+    "# The Best Form Builder in 2026\n\nTypeform is the best form builder for most teams. Its free plan allows 10 responses a month ([Typeform pricing](https://www.typeform.com/pricing/)).\n\n## Sources\n\n- [Typeform pricing](https://www.typeform.com/pricing/) — free-plan response limit\n- [Google Search Central](https://developers.google.com/search/docs) — how AI Overviews pick sources",
+  sources: [
+    { url: "https://www.typeform.com/pricing/", title: "Typeform pricing", used_for: "free-plan response limit" },
+    {
+      url: "https://developers.google.com/search/docs",
+      title: "Google Search Central",
+      used_for: "how AI Overviews pick sources",
+    },
+  ],
 };
 
 describe("AnalysisSchema", () => {
@@ -151,14 +180,108 @@ describe("AnalysisSchema", () => {
 });
 
 describe("DraftSchema", () => {
-  it("accepts a realistic draft object", () => {
-    expect(DraftSchema.parse(sampleDraft).title).toBe(sampleDraft.title);
+  it("accepts a realistic placeholders draft object", () => {
+    const parsed = DraftSchema.parse(sampleDraft);
+    expect(parsed.title).toBe(sampleDraft.title);
+    expect(parsed.sources).toEqual([]);
+  });
+
+  it("accepts a researched draft with its sources", () => {
+    const parsed = DraftSchema.parse(researchedDraft);
+    expect(parsed.sources).toHaveLength(2);
+    expect(parsed.sources[1]).toEqual({
+      url: "https://developers.google.com/search/docs",
+      title: "Google Search Central",
+      used_for: "how AI Overviews pick sources",
+    });
+    expect(parsed.outline.at(-1)?.heading).toBe("Sources");
   });
 
   it("rejects a missing required key", () => {
     const { content_md: _dropped, ...withoutBody } = sampleDraft;
     void _dropped;
     expect(() => DraftSchema.parse(withoutBody)).toThrow();
+  });
+
+  it("rejects a draft without the sources list", () => {
+    const { sources: _dropped, ...withoutSources } = sampleDraft;
+    void _dropped;
+    expect(() => DraftSchema.parse(withoutSources)).toThrow();
+  });
+
+  it("rejects a source that does not say what it was used for", () => {
+    const bad = { ...researchedDraft, sources: [{ url: "https://example.com/", title: "Example" }] };
+    expect(() => DraftSchema.parse(bad)).toThrow();
+  });
+});
+
+describe("draft prompts", () => {
+  const base: DraftInput = {
+    keyword: "best form builder",
+    blueprint: sampleAnalysis.blueprint,
+    patterns: sampleAnalysis.patterns,
+    citationResearch: sampleAnalysis.citation_research,
+    stableCore: sampleAnalysis.patterns.stable_core,
+    userEdge: null,
+    targetDomain: null,
+    competitorPolicy: "avoid",
+    mode: "researched",
+    notes: null,
+    previousDraft: null,
+  };
+
+  it("names the draft mode in the user message for both modes", () => {
+    const researched = buildDraftUserPrompt(base);
+    expect(researched).toContain("## Draft mode\nresearched");
+    expect(researched).toContain("Ready to publish");
+    expect(researched).not.toContain("[ADD YOUR DATA");
+
+    const placeholders = buildDraftUserPrompt({ ...base, mode: "placeholders" });
+    expect(placeholders).toContain("## Draft mode\nplaceholders");
+    expect(placeholders).toContain("With my own data");
+    expect(placeholders).toContain("[ADD YOUR DATA: ...]");
+  });
+
+  it("asks for no placeholder anywhere in a researched draft, even in the brand policy", () => {
+    // Under "avoid" with no site, the placeholders prompt leaves room for the author's own offer; the researched one must not.
+    expect(buildDraftUserPrompt({ ...base, mode: "placeholders" })).toContain(
+      "leaves a placeholder for the author's own offer",
+    );
+    const researched = buildDraftUserPrompt(base);
+    expect(researched).not.toContain("leaves a placeholder");
+    expect(researched).toContain("use the best public source and say what it is");
+  });
+
+  it("builds a system prompt per mode on the same shared rules", () => {
+    const researched = draftSystemPrompt("researched");
+    expect(researched).toContain("You have web_search and web_fetch");
+    expect(researched).toContain('"## Sources"');
+    expect(researched).toContain("Never write a placeholder of any kind");
+    expect(researched).toContain("at most 10 searches and 10 fetches");
+
+    const placeholders = draftSystemPrompt("placeholders");
+    expect(placeholders).toContain("[ADD YOUR DATA: what to add]");
+    expect(placeholders).toContain("sources field must be an empty array");
+    expect(placeholders).not.toContain("web_search");
+
+    for (const prompt of [researched, placeholders]) {
+      expect(prompt).toContain("Rules\n1. Answer the target question");
+      expect(prompt).toContain("14. When a previous draft and revision notes are given");
+      expect(prompt.trimEnd().endsWith("No prose before or after it.")).toBe(true);
+    }
+  });
+
+  it("carries the previous draft and the notes through a revision and keeps its mode", () => {
+    const prompt = buildDraftUserPrompt({
+      ...base,
+      mode: "placeholders",
+      notes: "Shorten the intro.",
+      previousDraft: { title: "Old title", content_md: "# Old\n\nOld body." },
+    });
+    expect(prompt).toContain("## Previous draft\nTitle: Old title");
+    expect(prompt).toContain("Old body.");
+    expect(prompt).toContain("## Revision notes from the author\nShorten the intro.");
+    expect(prompt).toContain("keep the draft mode");
   });
 });
 

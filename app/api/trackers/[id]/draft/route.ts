@@ -12,6 +12,8 @@ const NOTES_MAX = 2000;
 
 const BodySchema = z.object({
   notes: z.string().max(NOTES_MAX).optional(),
+  /** "researched" (default): figures found on the web and cited. "placeholders": the author fills them in. */
+  mode: z.enum(["researched", "placeholders"]).optional(),
 });
 
 async function readBody(request: Request): Promise<z.infer<typeof BodySchema> | null> {
@@ -28,7 +30,11 @@ async function readBody(request: Request): Promise<z.infer<typeof BodySchema> | 
   return result.success ? result.data : null;
 }
 
-/** POST /api/trackers/[id]/draft: write a new draft, optionally revised with the caller's notes. */
+/**
+ * POST /api/trackers/[id]/draft: write a new draft of one mode (body `mode`,
+ * default "researched"), optionally revised with the caller's `notes`.
+ * Responds { draftId, mode }.
+ */
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
 
@@ -76,14 +82,16 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   const body = await readBody(request);
   if (!body) {
     return NextResponse.json(
-      { error: `Notes must be plain text, up to ${NOTES_MAX.toLocaleString("en-US")} characters.` },
+      {
+        error: `We couldn't read that request. Notes must be plain text, up to ${NOTES_MAX.toLocaleString("en-US")} characters.`,
+      },
       { status: 422 },
     );
   }
 
   try {
-    const draft = await regenerateDraft(id, body.notes ?? null);
-    return NextResponse.json({ draftId: draft.id });
+    const draft = await regenerateDraft(id, body.notes ?? null, body.mode ?? "researched");
+    return NextResponse.json({ draftId: draft.id, mode: draft.mode });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Something went wrong writing your draft.";
     return NextResponse.json({ error: message }, { status: 500 });

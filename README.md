@@ -15,7 +15,8 @@ in [`CLAUDE.md`](./CLAUDE.md).
    answer and every citation of each one.
 3. **You get the report and the page.** Claude counts what survives across all samples, reads the
    most-cited pages, and plans a page that beats them: a winning angle, the gaps no page fills,
-   the contradictions between sources, and three things nobody has. Then it writes that page, with
+   the contradictions between sources, and three things nobody has. Then it writes that page in two
+   versions: one ready to publish, with every number found on the web and cited, and one with
    placeholders for your own data. The report is available from day one and refreshed on day 7.
 4. **Keep tracking.** After you publish, we keep checking and tell you when your site gets cited.
 
@@ -46,13 +47,14 @@ per day, under $0.09 per keyword week.
 ### 3. Anthropic
 
 Create an API key at https://console.anthropic.com. Analysis and writing use `claude-opus-5-5`.
-Measured on a real keyword: the analysis takes about 3 minutes (10 page fetches) and the draft
-about 2 minutes, roughly $0.90 together at list prices.
+Measured on a real keyword: the report takes 3 to 5 minutes (8 page fetches); a "with my own data"
+draft about 2 minutes; a "ready to publish" draft 3 to 6 minutes because it searches the web for
+every figure (up to 10 searches at $0.01 each). Expect $1 to $2 per keyword in total.
 
 Use a workspace key (`sk-ant-api03-...`). A personal key (`sk-ant-usr-...`) also works, but then
 set `ANTHROPIC_WORKSPACE_ID` to the workspace to bill (Console -> Settings -> Workspaces).
-The analysis reads cited pages with Anthropic's web fetch tool; make sure it is enabled for the
-organization in the Console.
+The report reads cited pages with Anthropic's web fetch tool and the "ready to publish" draft
+uses the web search tool as well; make sure both are enabled for the organization in the Console.
 
 To test the Claude integration without the app, run one real analysis on the saved
 DataForSEO response:

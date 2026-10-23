@@ -25,9 +25,10 @@ export interface DraftAutoStartProps {
 }
 
 /**
- * Shown in place of the draft when the report is done but its page was never
- * written (the function that writes both was stopped in between). Starts the
- * draft once on mount, then refreshes the page so the draft shows up.
+ * Shown in place of the draft when the report is done but its ready-to-publish
+ * page was never written (the function that writes both was stopped in between,
+ * or the report predates the researched version). Starts that version once on
+ * mount, then refreshes the page so the draft shows up.
  * A sessionStorage marker, keyed by the report, keeps a reload, or the other
  * tabs of the keyword page, from starting a second draft while the first one
  * is still running. The marker stays after a success (it expires on its own),
@@ -45,7 +46,7 @@ export function DraftAutoStart({ trackerId, analysisId, silent = false }: DraftA
       const response = await fetch(`/api/trackers/${trackerId}/draft`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({}),
+        body: JSON.stringify({ mode: "researched" }),
       });
       if (!response.ok) {
         clearStartedAt(storageKey);
@@ -125,7 +126,8 @@ export function DraftAutoStart({ trackerId, analysisId, silent = false }: DraftA
         <div>
           <h2 className="text-xl font-bold tracking-tight text-ink">Writing your page…</h2>
           <p className="mt-1 text-sm text-ink-muted" aria-live="polite">
-            About a minute. The page updates by itself, so you can leave it open.
+            Researching real numbers and sources. Three to six minutes. The page updates by itself, so you can
+            leave it open.
           </p>
         </div>
       </div>
