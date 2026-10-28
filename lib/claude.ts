@@ -181,6 +181,8 @@ export type DraftOutput = z.infer<typeof DraftSchema> & {
 export interface AnalysisHooks {
   /** Called with a short progress label the UI can show. Errors are swallowed. */
   onStep?: (step: string) => void | Promise<void>;
+  /** Thinking depth for this report; defaults to REPORT_EFFORT. */
+  effort?: ClaudeEffort;
 }
 
 // ---------------------------------------------------------------------------
@@ -232,11 +234,19 @@ export function rankCandidateUrls(
 type BetaMessage = Anthropic.Beta.BetaMessage;
 type ContentBlockStart = Anthropic.Beta.BetaRawContentBlockStartEvent["content_block"];
 
+/** Claude's thinking depth. Lower levels think less and cost less. */
+export type ClaudeEffort = "low" | "medium" | "high" | "xhigh" | "max";
+
+/** Effort used by the app for the report and the drafts. */
+export const REPORT_EFFORT: ClaudeEffort = "high";
+export const DRAFT_EFFORT: ClaudeEffort = "high";
+
 interface StructuredCall<S extends z.ZodType> {
   system: string;
   userPrompt: string;
   schema: S;
   maxTokens: number;
+  effort: ClaudeEffort;
   tools?: Anthropic.Beta.BetaToolUnion[];
   onBlockStart?: (block: ContentBlockStart) => void;
 }
@@ -384,7 +394,7 @@ async function runStructured<S extends z.ZodType>(call: StructuredCall<S>): Prom
   // parseOutput() and get the friendly messages below.
   const { type: formatType, schema: formatSchema } = zodOutputFormat(call.schema);
   let outputConfig: Anthropic.Beta.BetaOutputConfig = {
-    effort: "high",
+    effort: call.effort,
     format: { type: formatType, schema: formatSchema },
   };
   let usage: Anthropic.Beta.BetaUsage | null = null;
@@ -416,7 +426,7 @@ async function runStructured<S extends z.ZodType>(call: StructuredCall<S>): Prom
     } catch (err) {
       if (!formatRetried && outputConfig.format && isFormatRejection(err)) {
         formatRetried = true;
-        outputConfig = { effort: "high" };
+        outputConfig = { effort: call.effort };
         messages[0] = { role: "user", content: call.userPrompt + schemaInstruction(call.schema) };
         continue;
       }
@@ -465,6 +475,7 @@ export async function analyzeOverviews(input: AnalysisInput, hooks: AnalysisHook
     userPrompt: buildAnalysisUserPrompt(input, candidates),
     schema: AnalysisSchema,
     maxTokens: ANALYSIS_MAX_TOKENS,
+    effort: hooks.effort ?? REPORT_EFFORT,
     tools: [webFetchTool({ maxUses: MAX_FETCH_CANDIDATES, maxContentTokens: 12000 })],
     onBlockStart: (block) => {
       if (block.type === "server_tool_use") void report(1);
@@ -487,13 +498,17 @@ export async function analyzeOverviews(input: AnalysisInput, hooks: AnalysisHook
  * figure comes from a page it read and is cited; a placeholders draft gets no
  * tools and marks its figures [ADD YOUR DATA: ...] instead.
  */
-export async function writeDraft(input: DraftInput): Promise<DraftOutput> {
+export async function writeDraft(
+  input: DraftInput,
+  opts: { effort?: ClaudeEffort } = {},
+): Promise<DraftOutput> {
   const researched = input.mode === "researched";
   const { parsed, usage, model } = await runStructured({
     system: draftSystemPrompt(input.mode),
     userPrompt: buildDraftUserPrompt(input),
     schema: DraftSchema,
     maxTokens: DRAFT_MAX_TOKENS,
+    effort: opts.effort ?? DRAFT_EFFORT,
     ...(researched
       ? {
           tools: [
