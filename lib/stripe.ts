@@ -1,9 +1,9 @@
 /**
  * Stripe client and the small helpers the billing pages and the webhook share.
  * Payments stay off until both STRIPE_SECRET_KEY and STRIPE_WEBHOOK_SECRET are
- * set; scripts/stripe-setup.ts creates the product, the three monthly prices
- * (found here by their lookup keys), the webhook endpoint and the customer
- * portal settings. Server only.
+ * set; lib/stripe-setup.ts (POST /api/stripe/setup, or scripts/stripe-setup.ts)
+ * creates the product, the three monthly prices (found here by their lookup
+ * keys), the webhook endpoint and the customer portal settings. Server only.
  */
 import Stripe from "stripe";
 import { logApiCall } from "@/lib/api-log";

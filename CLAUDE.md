@@ -22,7 +22,8 @@ The full product plan is in `PLAN.md`. Read it before changing product behavior.
 - Billing: plans and credit prices in `lib/plans.ts` (pure); credits, refunds and the daily spend
   ceiling in `lib/billing.ts` (atomic SQL functions from `0006_billing.sql`, service role only);
   users' own API keys in `lib/own-keys.ts` (encrypted with `lib/crypto.ts`); Stripe in `lib/stripe.ts`
-  and `lib/stripe-sync.ts` (webhook at `/api/stripe/webhook`, setup via `scripts/stripe-setup.ts`).
+  and `lib/stripe-sync.ts` (webhook at `/api/stripe/webhook`; `lib/stripe-setup.ts` creates the product, prices, webhook and
+  portal settings, run by `POST /api/stripe/setup` with the cron secret or `scripts/stripe-setup.ts`).
 - Vercel hosting + Vercel Cron (`vercel.json` -> `/api/cron/capture`, daily).
 
 ## Rules
