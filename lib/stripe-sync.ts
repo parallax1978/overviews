@@ -10,7 +10,7 @@
  */
 import type Stripe from "stripe";
 import { addCredits, expireAllCredits, getAccount } from "@/lib/billing";
-import { paidPlan } from "@/lib/plans";
+import { isPlanActive, paidPlan } from "@/lib/plans";
 import { customerIdOf, planOfSubscription, stripeCall, subscriptionPeriod } from "@/lib/stripe";
 import { createAdminClient } from "@/lib/supabase/admin";
 import type { Account } from "@/lib/types";
@@ -131,6 +131,43 @@ export async function endSubscription(subscription: Stripe.Subscription, admin: 
   if (error) throw new Error(`Could not end the plan: ${error.message}`);
   await expireAllCredits(userId, "Plan ended", admin);
   return "ended";
+}
+
+/**
+ * Fulfils a checkout the moment the buyer comes back from Stripe, so their
+ * credits are there before the webhook arrives (it lands a few seconds
+ * later and changes nothing: grants are keyed by invoice). Only the signed-in
+ * user who started the session can fulfil it. Returns true when the plan is
+ * active, so the buyer can go straight to adding a keyword.
+ */
+export async function fulfillCheckout(sessionId: string, userId: string, admin: Admin = createAdminClient()): Promise<boolean> {
+  const session = await stripeCall("checkout.sessions.retrieve", userId, (stripe) =>
+    stripe.checkout.sessions.retrieve(sessionId),
+  );
+  if (session.client_reference_id !== userId) return false;
+  if (session.mode !== "subscription" || session.status !== "complete") return false;
+
+  const customerId = customerIdOf(session.customer);
+  if (customerId) {
+    const { error } = await admin
+      .from("accounts")
+      .upsert({ user_id: userId, stripe_customer_id: customerId, updated_at: new Date().toISOString() }, { onConflict: "user_id" });
+    if (error) throw new Error(`Could not link the customer: ${error.message}`);
+  }
+
+  const ref = session.subscription;
+  const subscriptionId = typeof ref === "string" ? ref : (ref?.id ?? null);
+  if (!subscriptionId) return false;
+  const subscription = await retrieveSubscription(subscriptionId, userId);
+  await syncSubscription(subscription, admin);
+
+  const invoiceRef = subscription.latest_invoice;
+  const invoiceId = typeof invoiceRef === "string" ? invoiceRef : (invoiceRef?.id ?? null);
+  if (invoiceId) {
+    const invoice = await stripeCall("invoices.retrieve", userId, (stripe) => stripe.invoices.retrieve(invoiceId));
+    if (invoice.status === "paid") await grantForInvoice(invoice, admin);
+  }
+  return isPlanActive(await getAccount(userId, admin));
 }
 
 /** Applies one verified event. Returns a short note for the logs. */

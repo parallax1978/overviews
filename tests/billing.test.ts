@@ -104,6 +104,8 @@ const mocks = vi.hoisted(() => ({
   rpc: vi.fn<(name: string, args: Record<string, unknown>) => Promise<{ data: unknown; error: null }>>(),
   accounts: [] as Row[],
   subscription: null as unknown,
+  /** Objects stripeCall returns by endpoint; anything else returns `subscription`. */
+  stripeObjects: {} as Record<string, unknown>,
   addCredits: vi.fn(),
   expireAllCredits: vi.fn(),
 }));
@@ -164,11 +166,14 @@ function fakeAdmin() {
 vi.mock("@/lib/supabase/admin", () => ({ createAdminClient: () => fakeAdmin() }));
 vi.mock("@/lib/stripe", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/lib/stripe")>();
-  return { ...actual, stripeCall: async () => mocks.subscription };
+  return {
+    ...actual,
+    stripeCall: async (endpoint: string) => mocks.stripeObjects[endpoint] ?? mocks.subscription,
+  };
 });
 
 const { chargeCredits, freeAccount, BillingError } = await import("@/lib/billing");
-const { grantForInvoice, endSubscription } = await import("@/lib/stripe-sync");
+const { grantForInvoice, endSubscription, fulfillCheckout } = await import("@/lib/stripe-sync");
 const { mayCapture } = await import("@/lib/capture");
 
 function account(overrides: Partial<Account> = {}): Account {
@@ -179,6 +184,7 @@ beforeEach(() => {
   mocks.rpc.mockReset();
   mocks.accounts = [];
   mocks.subscription = null;
+  mocks.stripeObjects = {};
 });
 
 describe("chargeCredits", () => {
@@ -309,6 +315,68 @@ describe("Stripe invoice credits", () => {
       "ignored: not the current subscription",
     );
     expect(mocks.accounts[0].plan).toBe("pro");
+  });
+});
+
+describe("returning from Stripe Checkout", () => {
+  function starterSubscription() {
+    const lookup = PAID_PLANS.find((p) => p.id === "starter")!.stripeLookupKey;
+    return {
+      id: "sub_1",
+      status: "active",
+      customer: "cus_1",
+      metadata: { user_id: "user-1" },
+      cancel_at_period_end: false,
+      cancel_at: null,
+      latest_invoice: "in_1",
+      items: {
+        data: [{ price: { lookup_key: lookup }, current_period_start: 1_000_000, current_period_end: 1_000_000 + 30 * 86400 }],
+      },
+    };
+  }
+
+  beforeEach(() => {
+    mocks.rpc.mockResolvedValue({ data: 60, error: null });
+    mocks.subscription = starterSubscription();
+    mocks.stripeObjects = {
+      "checkout.sessions.retrieve": {
+        id: "cs_1",
+        mode: "subscription",
+        status: "complete",
+        client_reference_id: "user-1",
+        customer: "cus_1",
+        subscription: "sub_1",
+      },
+      "invoices.retrieve": { id: "in_1", status: "paid", parent: { subscription_details: { subscription: "sub_1" } } },
+    };
+  });
+
+  const grants = () => mocks.rpc.mock.calls.filter(([name]) => name === "add_credits").map(([, args]) => args);
+
+  it("activates the plan and gives the credits before the webhook arrives", async () => {
+    await expect(fulfillCheckout("cs_1", "user-1")).resolves.toBe(true);
+    expect(mocks.accounts[0]).toMatchObject({ stripe_customer_id: "cus_1", plan: "starter", subscription_status: "active" });
+    expect(grants()).toEqual([expect.objectContaining({ p_amount: 60, p_external_id: "invoice:in_1" })]);
+  });
+
+  it("keys the grant by invoice, so the webhook's later delivery adds nothing", async () => {
+    await fulfillCheckout("cs_1", "user-1");
+    await grantForInvoice(mocks.stripeObjects["invoices.retrieve"] as never);
+    // Same period, same plan: the webhook finds the month already granted.
+    expect(grants()).toHaveLength(1);
+  });
+
+  it("refuses a checkout another user started", async () => {
+    await expect(fulfillCheckout("cs_1", "user-2")).resolves.toBe(false);
+    expect(mocks.accounts).toHaveLength(0);
+    expect(grants()).toHaveLength(0);
+  });
+
+  it("waits for the webhook when the payment isn't through yet", async () => {
+    (mocks.stripeObjects["invoices.retrieve"] as { status: string }).status = "open";
+    (mocks.subscription as { status: string }).status = "incomplete";
+    await expect(fulfillCheckout("cs_1", "user-1")).resolves.toBe(false);
+    expect(grants()).toHaveLength(0);
   });
 });
 

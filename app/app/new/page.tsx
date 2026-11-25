@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { ArrowLeft, KeyRound, Sparkles } from "lucide-react";
+import { ArrowLeft, CircleCheck, KeyRound, Sparkles } from "lucide-react";
 import { LinkButton } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Eyebrow } from "@/components/ui/eyebrow";
@@ -8,7 +8,7 @@ import { LocalTime } from "@/components/ui/local-time";
 import { requireUser } from "@/lib/auth";
 import { getAccount } from "@/lib/billing";
 import { loadOwnKeysStatus } from "@/lib/own-keys";
-import { CREDIT_COSTS, creditsLabel, isPlanActive } from "@/lib/plans";
+import { CREDIT_COSTS, creditsLabel, isPlanActive, keywordsForCredits, paidPlan } from "@/lib/plans";
 import type { Account } from "@/lib/types";
 import { NewKeywordForm, type PaymentChoice } from "./new-keyword-form";
 
@@ -62,12 +62,14 @@ export default async function NewKeywordPage({
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const user = await requireUser("/app/new");
-  const [{ keyword }, account, keys] = await Promise.all([
+  const [{ keyword, welcome }, account, keys] = await Promise.all([
     searchParams,
     getAccount(user.id),
     loadOwnKeysStatus(user.id),
   ]);
   const raw = Array.isArray(keyword) ? keyword[0] : keyword;
+  // Just back from Stripe Checkout with the plan active: say so once, above the form.
+  const newPlan = welcome === "1" && isPlanActive(account) ? paidPlan(account.plan) : null;
   const initialKeyword = (raw ?? "").trim().slice(0, 200);
 
   const staff = account.plan === "staff";
@@ -87,6 +89,16 @@ export default async function NewKeywordPage({
         <ArrowLeft className="h-4 w-4" aria-hidden="true" />
         Your keywords
       </Link>
+
+      {newPlan ? (
+        <div role="status" className="mt-6 flex items-start gap-3 rounded-2xl border border-line bg-good-soft p-4 text-sm text-good">
+          <CircleCheck className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+          <p>
+            Payment received. You&apos;re on {newPlan.name} with {creditsLabel(account.credits_balance)}, about{" "}
+            {keywordsForCredits(account.credits_balance)} keywords. Add your first one below.
+          </p>
+        </div>
+      ) : null}
 
       <div className="mt-6">
         <Eyebrow>New keyword</Eyebrow>

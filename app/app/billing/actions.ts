@@ -48,7 +48,8 @@ export async function startCheckout(formData: FormData): Promise<void> {
       metadata: { user_id: user.id, plan: plan.id },
       subscription_data: { metadata: { user_id: user.id, plan: plan.id } },
       allow_promotion_codes: true,
-      success_url: `${publicEnv.appUrl}/app/billing?checkout=success`,
+      // Stripe fills in the session id; /app/billing/confirm fulfils it and moves on to adding a keyword.
+      success_url: `${publicEnv.appUrl}/app/billing/confirm?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${publicEnv.appUrl}/pricing?checkout=canceled`,
     }),
   );

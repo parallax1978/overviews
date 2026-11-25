@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { CircleCheck, KeyRound, TriangleAlert } from "lucide-react";
+import { KeyRound, TriangleAlert } from "lucide-react";
+import { CheckoutReturn } from "@/components/billing/checkout-return";
 import { PlanCards } from "@/components/billing/plan-cards";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -108,15 +109,7 @@ export default async function BillingPage({
         <h1 className="mt-2 text-3xl font-bold tracking-tight text-ink">Your plan and credits</h1>
       </div>
 
-      {checkout === "success" ? (
-        <div role="status" className="flex items-start gap-3 rounded-2xl border border-line bg-good-soft p-4 text-sm text-good">
-          <CircleCheck className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
-          <p>
-            Thanks! Your plan is on. Credits can take a few seconds to arrive. Refresh this page if you don&apos;t see
-            them yet.
-          </p>
-        </div>
-      ) : null}
+      {checkout === "success" ? <CheckoutReturn ready={active} /> : null}
       {payments === "off" ? (
         <p role="status" className="rounded-2xl border border-line bg-white p-4 text-sm text-ink-muted">
           Paid plans open soon. Until then you can run keywords free on your own API keys.
