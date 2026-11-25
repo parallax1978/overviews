@@ -292,6 +292,13 @@ describe("Stripe invoice credits", () => {
     await expect(grantForInvoice(invoice("in_3"))).resolves.toBe("granted 60");
   });
 
+  it("grants nothing for an invoice of a subscription that already ended", async () => {
+    mocks.subscription = subscription("starter", 1_000_000, "canceled");
+    await expect(grantForInvoice(invoice("in_1"))).resolves.toBe("ignored: subscription ended");
+    expect(addCalls()).toHaveLength(0);
+    expect(mocks.accounts[0].plan).toBe("free");
+  });
+
   it("leaves the staff plan alone", async () => {
     mocks.accounts[0].plan = "staff";
     mocks.subscription = subscription("agency", 1_000_000);

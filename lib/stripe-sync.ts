@@ -75,6 +75,8 @@ export async function grantForInvoice(invoice: Stripe.Invoice, admin: Admin = cr
   const subscription = await retrieveSubscription(subscriptionId, null);
   const userId = await syncSubscription(subscription, admin);
   if (!userId) return "ignored: unknown customer";
+  // A notice that arrives after the subscription ended (out of order, or a refund and cancel) grants nothing.
+  if (ENDED.has(subscription.status)) return "ignored: subscription ended";
   const plan = planOfSubscription(subscription);
   if (!plan) return "ignored: price is not one of our plans";
 
