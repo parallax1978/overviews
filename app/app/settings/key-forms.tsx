@@ -99,7 +99,7 @@ export function AnthropicForm({ saved }: { saved: boolean }) {
       </div>
       <div>
         <label htmlFor="anthropic-workspace" className={labelClass}>
-          Workspace id (only for personal keys)
+          Workspace id (optional)
         </label>
         <input
           id="anthropic-workspace"
@@ -111,8 +111,8 @@ export function AnthropicForm({ saved }: { saved: boolean }) {
           className={fieldClass}
         />
         <p className="mt-1.5 text-sm text-ink-muted">
-          Leave it blank for a normal workspace key. A personal key (sk-ant-usr-...) needs the id of the workspace that
-          pays.
+          Leave it blank unless Anthropic says your key needs one. Some personal keys (sk-ant-usr-...) use it to pick
+          the workspace that pays.
         </p>
       </div>
       <div className="flex flex-wrap items-center gap-3">

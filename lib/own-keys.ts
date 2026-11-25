@@ -213,8 +213,8 @@ function anthropicKeyError(err: unknown): string {
 
 /**
  * Checks an Anthropic API key against the Models API (free), then saves it
- * encrypted. A user-scoped key (sk-ant-usr-...) also needs the id of the
- * workspace that pays.
+ * encrypted, with the workspace id when the user gave one (some personal
+ * sk-ant-usr- keys need it to say which workspace pays).
  */
 export async function saveAnthropicKey(
   userId: string,
@@ -223,15 +223,6 @@ export async function saveAnthropicKey(
 ): Promise<SaveKeysResult> {
   const credentials: AnthropicCredentials = { apiKey: apiKey.trim(), workspaceId: workspaceId?.trim() || null };
   if (!credentials.apiKey) return { ok: false, error: "Paste your Anthropic API key." };
-  if (!credentials.apiKey.startsWith("sk-ant-")) {
-    return { ok: false, error: "Anthropic API keys start with sk-ant-. Check that you copied the whole key." };
-  }
-  if (credentials.apiKey.startsWith("sk-ant-usr-") && !credentials.workspaceId) {
-    return {
-      ok: false,
-      error: "This is a personal key (sk-ant-usr-...). Add the id of the workspace that should pay, or use a workspace key.",
-    };
-  }
 
   const admin = createAdminClient();
   const startedAt = Date.now();
