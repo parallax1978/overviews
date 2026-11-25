@@ -15,8 +15,9 @@ import {
   writeDraft,
   type AnalysisSnapshotInput,
 } from "@/lib/claude";
+import { anthropicCredentialsFor } from "@/lib/own-keys";
 import { createAdminClient } from "@/lib/supabase/admin";
-import type { Analysis, Draft, DraftMode, Snapshot, Tracker, TrackerStatus } from "@/lib/types";
+import type { Analysis, ApiLogInsert, Draft, DraftMode, Snapshot, Tracker, TrackerStatus } from "@/lib/types";
 
 type Admin = ReturnType<typeof createAdminClient>;
 
@@ -38,6 +39,11 @@ export class DraftInProgressError extends Error {
 
 function errorMessage(err: unknown): string {
   return err instanceof Error ? err.message : String(err);
+}
+
+/** Whose keys a keyword's Claude calls ran on, for its api_log rows. */
+function billingOf(tracker: Pick<Tracker, "user_id" | "billing_source">): Pick<ApiLogInsert, "billing_source" | "user_id"> {
+  return { billing_source: tracker.billing_source ?? "platform", user_id: tracker.user_id ?? null };
 }
 
 async function loadTracker(admin: Admin, trackerId: string): Promise<Tracker> {
@@ -161,6 +167,8 @@ export async function runAnalysis(trackerId: string): Promise<Analysis> {
   if (!snapshots.some((s) => s.has_overview)) {
     throw new Error("No AI Overview has appeared for this keyword yet");
   }
+  // The owner's own key for a keyword on their own keys (throws before anything is claimed when it is missing).
+  const credentials = await anthropicCredentialsFor(tracker, admin);
 
   // Where to put the tracker back if this run fails: its previous resting state
   // (a paused keyword stays paused, an analyzed one keeps its old report).
@@ -213,6 +221,7 @@ export async function runAnalysis(trackerId: string): Promise<Analysis> {
         onStep: async (step) => {
           await admin.from("analyses").update({ step }).eq("id", analysisId);
         },
+        credentials,
       },
     );
 
@@ -242,6 +251,7 @@ export async function runAnalysis(trackerId: string): Promise<Analysis> {
       status: 200,
       cost_usd: estimateAnthropicCost(result.usage),
       duration_ms: Date.now() - startedAt,
+      ...billingOf(tracker),
     });
 
     await admin
@@ -261,6 +271,7 @@ export async function runAnalysis(trackerId: string): Promise<Analysis> {
       cost_usd: 0,
       duration_ms: Date.now() - startedAt,
       error: message,
+      ...billingOf(tracker),
     });
     throw err;
   }
@@ -322,6 +333,8 @@ export async function regenerateDraft(
   const previous = previousRow as Draft | null;
 
   const cleanNotes = notes?.trim() ? notes.trim() : null;
+  // The owner's own key for a keyword on their own keys (throws before the claim when it is missing).
+  const credentials = await anthropicCredentialsFor(tracker, admin);
 
   // One claim per report serializes both modes and notes revisions too, which
   // matches the UI (both buttons are disabled while any draft is written).
@@ -338,22 +351,25 @@ export async function regenerateDraft(
   const startedAt = Date.now();
 
   try {
-    const written = await writeDraft({
-      keyword: tracker.keyword,
-      blueprint: analysis.blueprint,
-      patterns: analysis.patterns,
-      citationResearch: analysis.citation_research ?? [],
-      stableCore: analysis.patterns.stable_core,
-      userEdge: tracker.user_edge,
-      targetDomain: tracker.target_domain,
-      competitorPolicy: tracker.competitor_policy ?? "avoid",
-      mode,
-      notes: cleanNotes,
-      previousDraft:
-        cleanNotes && previous?.content_md
-          ? { title: previous.title ?? "", content_md: previous.content_md }
-          : null,
-    });
+    const written = await writeDraft(
+      {
+        keyword: tracker.keyword,
+        blueprint: analysis.blueprint,
+        patterns: analysis.patterns,
+        citationResearch: analysis.citation_research ?? [],
+        stableCore: analysis.patterns.stable_core,
+        userEdge: tracker.user_edge,
+        targetDomain: tracker.target_domain,
+        competitorPolicy: tracker.competitor_policy ?? "avoid",
+        mode,
+        notes: cleanNotes,
+        previousDraft:
+          cleanNotes && previous?.content_md
+            ? { title: previous.title ?? "", content_md: previous.content_md }
+            : null,
+      },
+      { credentials },
+    );
 
     const { data: draftRow, error: draftError } = await admin
       .from("drafts")
@@ -384,6 +400,7 @@ export async function regenerateDraft(
       // Tokens plus the per-search fee a researched draft pays (fetches are free).
       cost_usd: estimateAnthropicCost(written.usage) + webSearchCost(written.usage),
       duration_ms: Date.now() - startedAt,
+      ...billingOf(tracker),
     });
 
     return draftRow as Draft;
@@ -396,6 +413,7 @@ export async function regenerateDraft(
       cost_usd: 0,
       duration_ms: Date.now() - startedAt,
       error: errorMessage(err),
+      ...billingOf(tracker),
     });
     throw err;
   } finally {

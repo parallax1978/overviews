@@ -86,7 +86,7 @@ export default async function TrackerPage({ params, searchParams }: PageProps) {
     }
   }
 
-  const [snapshotsRes, analysisRes, reportRes, draftRes] = await Promise.all([
+  const [snapshotsRes, analysisRes, reportRes, draftRes, accountRes] = await Promise.all([
     supabase
       .from("snapshots")
       .select("*")
@@ -117,6 +117,8 @@ export default async function TrackerPage({ params, searchParams }: PageProps) {
       .eq("tracker_id", id)
       .order("created_at", { ascending: false })
       .limit(DRAFTS_TO_LOAD),
+    // The owner's plan: the staff plan never pays credits. Read through RLS (own row only).
+    supabase.from("accounts").select("plan").eq("user_id", tracker.user_id).maybeSingle(),
   ]);
   if (snapshotsRes.error) console.error("snapshots query failed", snapshotsRes.error.message);
   if (analysisRes.error) console.error("analysis query failed", analysisRes.error.message);
@@ -146,6 +148,11 @@ export default async function TrackerPage({ params, searchParams }: PageProps) {
   // A report exists but days were captured after it: offer a fresh one once all days are in.
   const reportStale =
     tracker.status === "analyzed" && tracker.day_count >= tracker.days_target && isReportStale(report, snapshots);
+  // Keywords on the app's keys pay credits for extra reports and pages (never on the staff plan);
+  // keywords on the owner's own keys are free here and refresh their report by themselves on the last day.
+  const ownKeys = tracker.billing_source === "own_keys";
+  const staffPlan = (accountRes.data as { plan?: string } | null)?.plan === "staff";
+  const chargesCredits = !ownKeys && !staffPlan;
   const languageName = LANGUAGES.find((l) => l.code === tracker.language_code)?.name ?? tracker.language_code;
   const deviceName = tracker.device === "mobile" ? "Mobile" : "Desktop";
 
@@ -181,6 +188,12 @@ export default async function TrackerPage({ params, searchParams }: PageProps) {
               <>
                 <span aria-hidden="true">·</span>
                 <span>Watching for {tracker.target_domain}</span>
+              </>
+            ) : null}
+            {ownKeys ? (
+              <>
+                <span aria-hidden="true">·</span>
+                <span>On your own keys</span>
               </>
             ) : null}
           </p>
@@ -229,6 +242,8 @@ export default async function TrackerPage({ params, searchParams }: PageProps) {
               daysWithOverview={totals.daysWithOverview}
               dayCount={tracker.day_count}
               staleReport={reportStale}
+              chargesCredits={chargesCredits}
+              updatesAtTarget={ownKeys}
             />
           )
         ) : (
@@ -239,6 +254,7 @@ export default async function TrackerPage({ params, searchParams }: PageProps) {
             canRegenerate={hasReport}
             autoStart={needsDraft ? report.id : null}
             writing={draftWriting}
+            chargesCredits={chargesCredits}
           />
         )}
       </div>

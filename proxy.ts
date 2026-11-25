@@ -7,7 +7,7 @@ export async function proxy(request: NextRequest) {
 
 export const config = {
   matcher: [
-    // Everything except static assets, images, the cron endpoint and the auth callback.
-    "/((?!_next/static|_next/image|favicon.ico|icon.svg|api/cron|auth/confirm|.*\\.(?:svg|png|jpg|jpeg|gif|webp|woff2?)$).*)",
+    // Everything except static assets, images, the cron endpoint, Stripe's webhook and the auth callback.
+    "/((?!_next/static|_next/image|favicon.ico|icon.svg|api/cron|api/stripe|auth/confirm|.*\\.(?:svg|png|jpg|jpeg|gif|webp|woff2?)$).*)",
   ],
 };

@@ -15,6 +15,8 @@ export async function logApiCall(admin: SupabaseClient, entry: ApiLogInsert): Pr
       cost_usd: entry.cost_usd,
       duration_ms: entry.duration_ms,
       error: entry.error ?? null,
+      billing_source: entry.billing_source ?? "platform",
+      user_id: entry.user_id ?? null,
     });
     if (error) console.error("api_log insert failed", error.message);
   } catch (err) {

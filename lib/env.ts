@@ -43,4 +43,21 @@ export const serverEnv = {
   get cronSecret() {
     return required("CRON_SECRET");
   },
+  /** Stripe secret key (sk_live_... or sk_test_...). Null until payments are set up. */
+  get stripeSecretKey() {
+    return process.env.STRIPE_SECRET_KEY || null;
+  },
+  /** Signing secret of the Stripe webhook endpoint (whsec_...). */
+  get stripeWebhookSecret() {
+    return process.env.STRIPE_WEBHOOK_SECRET || null;
+  },
+  /** 32-byte key, base64, that encrypts users' own API keys at rest. */
+  get ownKeysEncryptionKey() {
+    return required("OWN_KEYS_ENCRYPTION_KEY");
+  },
+  /** Safety ceiling on the app's own API spend per UTC day; new reports pause above it. */
+  get platformDailyLimitUsd() {
+    const value = Number(process.env.PLATFORM_DAILY_LIMIT_USD);
+    return Number.isFinite(value) && value > 0 ? value : 75;
+  },
 };

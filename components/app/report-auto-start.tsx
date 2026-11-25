@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { LoaderCircle, RefreshCw, TriangleAlert } from "lucide-react";
+import { ApiErrorText, readApiError, type ApiError } from "@/components/app/api-error";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Eyebrow } from "@/components/ui/eyebrow";
@@ -24,7 +25,7 @@ const EARLY_REFRESH_MS = 2500;
 export function ReportAutoStart({ trackerId, daysTarget }: { trackerId: string; daysTarget: number }) {
   const router = useRouter();
   const started = useRef(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<ApiError | null>(null);
   const storageKey = `report-auto-${trackerId}`;
 
   const start = useCallback(async () => {
@@ -35,14 +36,18 @@ export function ReportAutoStart({ trackerId, daysTarget }: { trackerId: string; 
       clearTimeout(early);
       if (!response.ok && response.status !== 409) {
         clearStartedAt(storageKey);
-        setError(await readError(response));
+        setError(await readApiError(response, "Something went wrong building your report. Please try again."));
         return;
       }
       clearStartedAt(storageKey);
       router.refresh();
     } catch {
       clearTimeout(early);
-      setError("We lost the connection. Refresh the page in a few minutes to see whether your report arrived.");
+      setError({
+        message: "We lost the connection. Refresh the page in a few minutes to see whether your report arrived.",
+        upgrade: false,
+        settings: false,
+      });
     }
   }, [router, storageKey, trackerId]);
 
@@ -70,7 +75,9 @@ export function ReportAutoStart({ trackerId, daysTarget }: { trackerId: string; 
           <TriangleAlert className="mt-0.5 h-5 w-5 shrink-0 text-bad" aria-hidden="true" />
           <div>
             <h2 className="text-base font-bold text-ink">We couldn&apos;t build your report</h2>
-            <p className="mt-1 text-sm text-bad">{error}</p>
+            <p className="mt-1 text-sm text-bad">
+              <ApiErrorText error={error} />
+            </p>
           </div>
         </div>
         <div className="mt-4">
@@ -132,14 +139,4 @@ function clearStartedAt(key: string): void {
   } catch {
     // Nothing to clear.
   }
-}
-
-async function readError(response: Response): Promise<string> {
-  try {
-    const body = (await response.json()) as { error?: unknown };
-    if (typeof body.error === "string" && body.error) return body.error;
-  } catch {
-    // Not JSON.
-  }
-  return "Something went wrong building your report. Please try again.";
 }

@@ -4,15 +4,29 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { requireUser } from "@/lib/auth";
+import {
+  assertPlatformBudget,
+  BillingError,
+  chargeCredits,
+  getAccount,
+  insufficientCreditsError,
+  planRequiredError,
+} from "@/lib/billing";
 import { captureSnapshot } from "@/lib/capture";
+import { loadOwnKeysStatus } from "@/lib/own-keys";
+import { CREDIT_COSTS, isPlanActive, OWN_KEYS_LIMITS } from "@/lib/plans";
 import { nextCaptureAt } from "@/lib/schedule";
-import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { DEFAULT_DAYS_TARGET, LANGUAGES, LOCATIONS, type Tracker } from "@/lib/types";
 import { normalizeDomain } from "@/lib/utils";
 
 /** What the form gets back when the keyword could not be created. On success the action redirects instead. */
 export interface CreateTrackerState {
   error: string;
+  /** The fix is a plan or more credits: the form links to the billing page. */
+  upgrade?: boolean;
+  /** The fix is saving your own keys: the form links to Settings. */
+  settings?: boolean;
 }
 
 const DOMAIN_PATTERN = /^[a-z0-9-]+(\.[a-z0-9-]+)+$/;
@@ -45,6 +59,8 @@ const formSchema = z.object({
     .max(2000, "Keep your edge under 2,000 characters.")
     .transform((value) => (value.length > 0 ? value : null)),
   competitor_policy: z.enum(["avoid", "compare"]).catch("avoid"),
+  /** "platform": our keys, paid with plan credits. "own_keys": the user's own API keys, free. */
+  billing_source: z.enum(["platform", "own_keys"]).catch("platform"),
 });
 
 function field(formData: FormData, name: string): string {
@@ -52,9 +68,25 @@ function field(formData: FormData, name: string): string {
   return typeof value === "string" ? value : "";
 }
 
+/** Keywords on the user's own keys that are still in their 7-day study (the fair-use limit counts these). */
+async function countOwnKeyStudies(admin: ReturnType<typeof createAdminClient>, userId: string): Promise<number> {
+  const { data, error } = await admin
+    .from("trackers")
+    .select("id, day_count, days_target, status")
+    .eq("user_id", userId)
+    .eq("billing_source", "own_keys");
+  if (error) throw new Error(error.message);
+  type Row = Pick<Tracker, "day_count" | "days_target" | "status">;
+  const inStudy = ((data ?? []) as Row[]).filter(
+    (t) => t.day_count < t.days_target && t.status !== "paused" && t.status !== "error",
+  );
+  return inStudy.length;
+}
+
 /**
- * Server action for useActionState: validates the form, inserts the tracker as the
- * signed-in user, captures day 1 right away, then redirects to the keyword page.
+ * Server action for useActionState: validates the form, checks how the keyword
+ * is paid for (credits on a plan, or the user's own keys), saves it, takes the
+ * credits, captures day 1 right away, then redirects to the keyword page.
  */
 export async function createTrackerAction(
   _prev: CreateTrackerState | null,
@@ -69,6 +101,7 @@ export async function createTrackerAction(
     target_domain: field(formData, "target_domain"),
     user_edge: field(formData, "user_edge"),
     competitor_policy: field(formData, "competitor_policy") || "avoid",
+    billing_source: field(formData, "billing_source") || "platform",
   });
   if (!parsed.success) {
     return { error: parsed.error.issues[0]?.message ?? "Please check the form and try again." };
@@ -77,8 +110,44 @@ export async function createTrackerAction(
   const location = LOCATIONS.find((l) => l.code === input.location_code);
   if (!location) return { error: "Pick a country from the list." };
 
-  const supabase = await createClient();
-  const { data, error } = await supabase
+  // Who pays: the user's own keys (checked and within fair use) or plan credits.
+  const admin = createAdminClient();
+  const account = await getAccount(user.id, admin);
+  if (input.billing_source === "own_keys") {
+    const keys = await loadOwnKeysStatus(user.id, admin);
+    if (!keys.complete) {
+      return {
+        error: "Save your DataForSEO login and Anthropic key in Settings first, or run this keyword on a plan.",
+        settings: true,
+      };
+    }
+    if ((await countOwnKeyStudies(admin, user.id)) >= OWN_KEYS_LIMITS.activeStudies) {
+      return {
+        error: `You can run ${OWN_KEYS_LIMITS.activeStudies} keywords at once on your own keys. Wait for one to finish its 7 days, or pause one.`,
+      };
+    }
+  } else {
+    // A quick check before saving anything; the charge below is the atomic one.
+    if (account.plan !== "staff") {
+      if (!isPlanActive(account)) {
+        const err = planRequiredError();
+        return { error: err.message, upgrade: true };
+      }
+      if (account.credits_balance < CREDIT_COSTS.newKeyword) {
+        const err = insufficientCreditsError(CREDIT_COSTS.newKeyword, account.credits_balance);
+        return { error: err.message, upgrade: true };
+      }
+    }
+    try {
+      await assertPlatformBudget(account, admin);
+    } catch (err) {
+      if (err instanceof BillingError) return { error: err.message, upgrade: err.upgrade };
+      throw err;
+    }
+  }
+
+  // Keywords are created with the service role: browsers can't write them directly (credits).
+  const { data, error } = await admin
     .from("trackers")
     .insert({
       user_id: user.id,
@@ -90,6 +159,7 @@ export async function createTrackerAction(
       target_domain: input.target_domain,
       user_edge: input.user_edge,
       competitor_policy: input.competitor_policy,
+      billing_source: input.billing_source,
       status: "tracking",
       days_target: DEFAULT_DAYS_TARGET,
       day_count: 0,
@@ -102,6 +172,25 @@ export async function createTrackerAction(
     return { error: "We could not save your keyword. Please try again." };
   }
   const trackerId = (data as Pick<Tracker, "id">).id;
+
+  if (input.billing_source === "platform") {
+    try {
+      await chargeCredits({
+        account,
+        amount: CREDIT_COSTS.newKeyword,
+        reason: "new_keyword",
+        trackerId,
+        note: input.keyword,
+        admin,
+      });
+    } catch (err) {
+      // Not paid for: take the keyword back out.
+      await admin.from("trackers").delete().eq("id", trackerId);
+      if (err instanceof BillingError) return { error: err.message, upgrade: err.upgrade };
+      console.error("keyword charge failed", err instanceof Error ? err.message : err);
+      return { error: "We couldn't use your credits. Please try again." };
+    }
+  }
 
   try {
     await captureSnapshot(trackerId, { dayNumber: 1 });

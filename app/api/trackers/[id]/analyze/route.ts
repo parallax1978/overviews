@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { AnalysisInProgressError, recoverStaleAnalysis, runAnalysis } from "@/lib/analyze";
 import { getUser } from "@/lib/auth";
+import { BillingError, chargeForReport, type Charge } from "@/lib/billing";
+import { OwnKeysMissingError } from "@/lib/own-keys";
 import { createClient } from "@/lib/supabase/server";
 import type { Tracker } from "@/lib/types";
 
@@ -54,14 +56,32 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
     );
   }
 
+  // The keyword's first report is part of what adding it paid for; another one
+  // (an update) costs credits on the app's keys. Own keys are never charged.
+  let charge: Charge;
+  try {
+    charge = await chargeForReport(tracker);
+  } catch (err) {
+    if (err instanceof BillingError) {
+      return NextResponse.json({ error: err.message, upgrade: err.upgrade }, { status: err.status });
+    }
+    return NextResponse.json({ error: "We couldn't check your credits. Please try again." }, { status: 500 });
+  }
+
   // One day with an AI Overview is enough for a first report; the report says how many
-  // days it is based on, and day 7 triggers a fresh one automatically.
+  // days it is based on.
   try {
     const analysis = await runAnalysis(id);
     return NextResponse.json({ analysisId: analysis.id });
   } catch (err) {
+    await charge.refund("The report didn't finish").catch((refundErr) => {
+      console.error("report refund failed", id, refundErr instanceof Error ? refundErr.message : refundErr);
+    });
     if (err instanceof AnalysisInProgressError) {
       return NextResponse.json({ error: err.message }, { status: 409 });
+    }
+    if (err instanceof OwnKeysMissingError) {
+      return NextResponse.json({ error: err.message, settings: true }, { status: 422 });
     }
     const message = err instanceof Error ? err.message : "Something went wrong building your report.";
     return NextResponse.json({ error: message }, { status: 500 });

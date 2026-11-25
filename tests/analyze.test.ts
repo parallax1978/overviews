@@ -130,6 +130,11 @@ vi.mock("@/lib/claude", async (importOriginal) => {
 // The draft route: a signed-in user whose RLS client reads the same fake rows.
 vi.mock("@/lib/auth", () => ({ getUser: async () => ({ id: "user-1", email: null }) }));
 vi.mock("@/lib/supabase/server", () => ({ createClient: async () => mocks.admin }));
+// Billing is covered by tests/billing.test.ts: here the keyword's page is free (its first one).
+vi.mock("@/lib/billing", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/billing")>();
+  return { ...actual, chargeForDraft: async () => ({ credits: 0, refund: async () => {} }) };
+});
 
 const { DraftInProgressError, STALE_DRAFT_MS, isDraftWriting, regenerateDraft, restingStatus, statusAfterAnalysis } =
   await import("@/lib/analyze");

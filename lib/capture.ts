@@ -8,17 +8,21 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { recoverStaleAnalysis, regenerateDraft, runAnalysis } from "@/lib/analyze";
 import { logApiCall } from "@/lib/api-log";
+import { assertPlatformBudget, BillingError, getAccount, getAccounts, refundKeywordCharge } from "@/lib/billing";
 import {
   type CaptureResult,
   DATAFORSEO_ENDPOINT,
   DataForSeoError,
+  type DataForSeoCredentials,
   fetchSerpWithAiOverview,
 } from "@/lib/dataforseo";
 import { type Comparable, computeDayDiff } from "@/lib/diff";
+import { dataforseoCredentialsFor } from "@/lib/own-keys";
 import { normalizeAiOverview } from "@/lib/overview";
+import { isPlanActive, keepTrackingLimit, NO_OVERVIEW_REFUND } from "@/lib/plans";
 import { isCaptureDue, nextCaptureAt } from "@/lib/schedule";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { SAMPLES_PER_DAY, type Snapshot, type Tracker, type TrackerStatus } from "@/lib/types";
+import { SAMPLES_PER_DAY, type Account, type Snapshot, type Tracker, type TrackerStatus } from "@/lib/types";
 import { domainMatches } from "@/lib/utils";
 
 const UNIQUE_VIOLATION = "23505";
@@ -49,6 +53,10 @@ export interface CaptureRunSummary {
   failed: { trackerId: string; error: string }[];
   analyzed: string[];
   analysisFailed: { trackerId: string; error: string }[];
+  /** Kept-tracked pages not captured because their owner's plan ended or is over its keep-tracking limit. */
+  skipped: string[];
+  /** Keywords whose credits came back because no AI Overview appeared in their whole study. */
+  refunded: string[];
 }
 
 export { isCaptureDue, nextCaptureAt };
@@ -76,8 +84,17 @@ export async function captureSnapshot(
   const have = new Set(snapshots.map((s) => s.sample));
   const missing = Array.from({ length: SAMPLES_PER_DAY }, (_, i) => i + 1).filter((s) => !have.has(s));
 
+  // The app's DataForSEO account, or the owner's own for a keyword on their own keys.
+  let credentials: DataForSeoCredentials;
+  try {
+    credentials = await dataforseoCredentialsFor(tracker, admin);
+  } catch (err) {
+    await markCaptureFailed(admin, tracker.id, dayNumber, shortErrorMessage(err));
+    throw err;
+  }
+
   const settled = await Promise.allSettled(
-    missing.map((sample) => captureSample(admin, tracker, dayNumber, sample)),
+    missing.map((sample) => captureSample(admin, tracker, dayNumber, sample, credentials)),
   );
   let firstError: unknown = null;
   for (const outcome of settled) {
@@ -121,7 +138,15 @@ export async function runDueCaptures(opts?: {
   const concurrency = Math.max(1, opts?.concurrency ?? DEFAULT_CONCURRENCY);
   const admin = createAdminClient();
 
-  const summary: CaptureRunSummary = { recovered: [], captured: [], failed: [], analyzed: [], analysisFailed: [] };
+  const summary: CaptureRunSummary = {
+    recovered: [],
+    captured: [],
+    failed: [],
+    analyzed: [],
+    analysisFailed: [],
+    skipped: [],
+    refunded: [],
+  };
   const startedAt = Date.now();
   const elapsed = () => Date.now() - startedAt;
 
@@ -141,19 +166,32 @@ export async function runDueCaptures(opts?: {
 
   const { data, error } = await admin
     .from("trackers")
-    .select("id, status, keep_tracking, day_count, days_target, next_capture_at")
+    .select("id, user_id, billing_source, status, keep_tracking, day_count, days_target, next_capture_at, created_at")
     .lte("next_capture_at", now.toISOString())
     .in("status", ["tracking", "analyzed", "ready"])
     .order("next_capture_at", { ascending: true })
     .limit(limit);
   if (error) throw new Error(`Could not load due trackers: ${error.message}`);
 
-  type DueRow = Pick<Tracker, "id" | "status" | "keep_tracking" | "day_count" | "days_target" | "next_capture_at">;
-  const due = ((data ?? []) as DueRow[]).filter((t) => isCaptureDue(t, now));
+  const dueRows = ((data ?? []) as DueRow[]).filter((t) => isCaptureDue(t, now));
+  const accounts = await getAccounts(
+    dueRows.map((t) => t.user_id),
+    admin,
+  );
+  const keptTracked = await loadKeptTrackedOnPlatform(
+    admin,
+    dueRows.filter((t) => isKeepTrackingCapture(t) && t.billing_source !== "own_keys").map((t) => t.user_id),
+  );
+  const due: DueRow[] = [];
+  for (const tracker of dueRows) {
+    if (mayCapture(tracker, accounts, keptTracked)) due.push(tracker);
+    else summary.skipped.push(tracker.id);
+  }
 
   // Reports owed from earlier runs: trackers at their target, with an overview, that were never analyzed.
   const pending = await loadPendingReports(admin, PENDING_REPORTS_PER_RUN);
   const needsReport: string[] = [...pending];
+  const finishedStudies: DueRow[] = [];
 
   type Job = () => Promise<void>;
   const queue: Job[] = [];
@@ -167,7 +205,7 @@ export async function runDueCaptures(opts?: {
       const { tracker: after } = await captureSnapshot(before.id);
       summary.captured.push(before.id);
       if (before.day_count < before.days_target && after.day_count >= after.days_target) {
-        needsReport.push(before.id);
+        finishedStudies.push(before);
       }
     } catch (err) {
       summary.failed.push({ trackerId: before.id, error: shortErrorMessage(err) });
@@ -181,6 +219,34 @@ export async function runDueCaptures(opts?: {
   };
   await Promise.all(Array.from({ length: Math.min(concurrency, queue.length) }, worker));
 
+  // A study that just ended gets its report, which adding the keyword paid for.
+  // With no AI Overview in the whole study there is nothing to report, so a
+  // keyword on the app's keys gets most of its credits back. A keyword on the
+  // app's keys whose report was already built early keeps that report: a fresh
+  // one is an update the owner chooses (and pays for). On their own keys the
+  // owner pays the APIs directly, so the fresh report is built as before.
+  for (const study of finishedStudies) {
+    try {
+      if (!(await hasOverviewSample(admin, study.id))) {
+        if (study.billing_source !== "own_keys") {
+          const refunded = await refundKeywordCharge({
+            userId: study.user_id,
+            trackerId: study.id,
+            amount: NO_OVERVIEW_REFUND,
+            why: "no_overview",
+            admin,
+          });
+          if (refunded) summary.refunded.push(study.id);
+        }
+        continue;
+      }
+      if (study.billing_source !== "own_keys" && (await hasFinishedReport(admin, study.id))) continue;
+      needsReport.push(study.id);
+    } catch (err) {
+      summary.analysisFailed.push({ trackerId: study.id, error: shortErrorMessage(err) });
+    }
+  }
+
   // Reports run one at a time: each is a single multi-minute Claude call.
   for (const trackerId of [...new Set(needsReport)]) {
     if (elapsed() > ANALYSIS_START_BUDGET_MS) {
@@ -188,15 +254,118 @@ export async function runDueCaptures(opts?: {
       continue;
     }
     try {
+      const owner = await loadBilling(admin, trackerId);
+      if (owner.billing_source !== "own_keys") {
+        await assertPlatformBudget(accounts.get(owner.user_id) ?? (await getAccount(owner.user_id, admin)), admin);
+      }
       await runAnalysis(trackerId);
       summary.analyzed.push(trackerId);
       if (elapsed() < DRAFT_START_BUDGET_MS) await regenerateDraft(trackerId, null, "researched");
     } catch (err) {
-      summary.analysisFailed.push({ trackerId, error: shortErrorMessage(err) });
+      // Over the daily ceiling: the keyword page builds the report when its owner opens it.
+      const reason = err instanceof BillingError ? `skipped: ${err.message}` : shortErrorMessage(err);
+      summary.analysisFailed.push({ trackerId, error: reason });
     }
   }
 
   return summary;
+}
+
+type DueRow = Pick<
+  Tracker,
+  | "id"
+  | "user_id"
+  | "billing_source"
+  | "status"
+  | "keep_tracking"
+  | "day_count"
+  | "days_target"
+  | "next_capture_at"
+  | "created_at"
+>;
+
+/** A capture after the 7-day study: the page is being kept tracked. */
+function isKeepTrackingCapture(t: Pick<Tracker, "day_count" | "days_target">): boolean {
+  return t.day_count >= t.days_target;
+}
+
+/**
+ * Whether the daily job may capture this keyword on its owner's behalf. A
+ * study in progress was paid for when it started, so it always runs. Keeping a
+ * page tracked afterwards on the app's keys needs an active plan, and only the
+ * plan's oldest kept-tracked pages, up to its limit, run. On the owner's own
+ * keys it always runs (the limit is checked when they turn it on). Pure.
+ */
+export function mayCapture(
+  tracker: Pick<Tracker, "id" | "user_id" | "billing_source" | "day_count" | "days_target">,
+  accounts: Map<string, Pick<Account, "plan" | "subscription_status">>,
+  keptTrackedByUser: Map<string, string[]>,
+): boolean {
+  if (!isKeepTrackingCapture(tracker) || tracker.billing_source === "own_keys") return true;
+  const account = accounts.get(tracker.user_id) ?? null;
+  if (!account || !isPlanActive(account)) return false;
+  const limit = keepTrackingLimit(account.plan, "platform");
+  const order = keptTrackedByUser.get(tracker.user_id) ?? [];
+  const rank = order.indexOf(tracker.id);
+  return rank === -1 ? order.length < limit : rank < limit;
+}
+
+/** Every kept-tracked, unpaused keyword on the app's keys for these users, oldest first, so the plan limit picks the same ones every run. */
+async function loadKeptTrackedOnPlatform(admin: SupabaseClient, userIds: string[]): Promise<Map<string, string[]>> {
+  const byUser = new Map<string, string[]>();
+  const ids = [...new Set(userIds)];
+  if (ids.length === 0) return byUser;
+  const { data, error } = await admin
+    .from("trackers")
+    .select("id, user_id, billing_source, status, day_count, days_target, created_at")
+    .in("user_id", ids)
+    .eq("keep_tracking", true)
+    .order("created_at", { ascending: true });
+  if (error) throw new Error(`Could not load kept-tracked keywords: ${error.message}`);
+  type Row = Pick<Tracker, "id" | "user_id" | "billing_source" | "status" | "day_count" | "days_target">;
+  for (const row of (data ?? []) as Row[]) {
+    // A paused keyword isn't captured, so it doesn't take one of the plan's slots.
+    if (row.billing_source === "own_keys" || row.status === "paused" || !isKeepTrackingCapture(row)) continue;
+    const list = byUser.get(row.user_id) ?? [];
+    list.push(row.id);
+    byUser.set(row.user_id, list);
+  }
+  return byUser;
+}
+
+async function loadBilling(admin: SupabaseClient, trackerId: string): Promise<Pick<Tracker, "user_id" | "billing_source">> {
+  const { data, error } = await admin
+    .from("trackers")
+    .select("user_id, billing_source")
+    .eq("id", trackerId)
+    .maybeSingle();
+  if (error) throw new Error(`Could not load tracker: ${error.message}`);
+  if (!data) throw new Error(`Tracker ${trackerId} not found`);
+  return data as Pick<Tracker, "user_id" | "billing_source">;
+}
+
+/** True when any sample of the keyword had an AI Overview. */
+async function hasOverviewSample(admin: SupabaseClient, trackerId: string): Promise<boolean> {
+  const { data, error } = await admin
+    .from("snapshots")
+    .select("id")
+    .eq("tracker_id", trackerId)
+    .eq("has_overview", true)
+    .limit(1);
+  if (error) throw new Error(`Could not load snapshots: ${error.message}`);
+  return (data ?? []).length > 0;
+}
+
+/** True when the keyword already has a finished report. */
+async function hasFinishedReport(admin: SupabaseClient, trackerId: string): Promise<boolean> {
+  const { data, error } = await admin
+    .from("analyses")
+    .select("id")
+    .eq("tracker_id", trackerId)
+    .eq("status", "done")
+    .limit(1);
+  if (error) throw new Error(`Could not load reports: ${error.message}`);
+  return (data ?? []).length > 0;
 }
 
 // ---------------------------------------------------------------------------
@@ -300,16 +469,21 @@ async function captureSample(
   tracker: Tracker,
   dayNumber: number,
   sample: number,
+  credentials: DataForSeoCredentials,
 ): Promise<Snapshot> {
   const startedAt = Date.now();
+  const billing = { billing_source: tracker.billing_source ?? "platform", user_id: tracker.user_id ?? null };
   let result: CaptureResult;
   try {
-    result = await fetchSerpWithAiOverview({
-      keyword: tracker.keyword,
-      location_code: tracker.location_code,
-      language_code: tracker.language_code,
-      device: tracker.device,
-    });
+    result = await fetchSerpWithAiOverview(
+      {
+        keyword: tracker.keyword,
+        location_code: tracker.location_code,
+        language_code: tracker.language_code,
+        device: tracker.device,
+      },
+      credentials,
+    );
   } catch (err) {
     await logApiCall(admin, {
       tracker_id: tracker.id,
@@ -319,6 +493,7 @@ async function captureSample(
       cost_usd: 0,
       duration_ms: Date.now() - startedAt,
       error: shortErrorMessage(err),
+      ...billing,
     });
     throw err;
   }
@@ -329,6 +504,7 @@ async function captureSample(
     status: 200,
     cost_usd: result.cost,
     duration_ms: Date.now() - startedAt,
+    ...billing,
   });
   return storeSample(admin, tracker, dayNumber, sample, result);
 }

@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { DraftInProgressError, recoverStaleAnalysis, regenerateDraft } from "@/lib/analyze";
 import { getUser } from "@/lib/auth";
+import { BillingError, chargeForDraft, type Charge } from "@/lib/billing";
+import { OwnKeysMissingError } from "@/lib/own-keys";
 import { createClient } from "@/lib/supabase/server";
 import type { Tracker } from "@/lib/types";
 
@@ -67,11 +69,13 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   }
 
   // Any other status may write a page from its finished report: a paused keyword keeps its report.
+  // The newest one: that is the report regenerateDraft writes from.
   const { data: report, error: reportError } = await supabase
     .from("analyses")
     .select("id")
     .eq("tracker_id", id)
     .eq("status", "done")
+    .order("created_at", { ascending: false })
     .limit(1)
     .maybeSingle();
   if (reportError) return NextResponse.json({ error: reportError.message }, { status: 500 });
@@ -89,12 +93,32 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     );
   }
 
+  const mode = body.mode ?? "researched";
+
+  // Each report's first ready-to-publish page is included; rewrites and the
+  // with-my-own-data version cost credits on the app's keys. Own keys are never charged.
+  let charge: Charge;
   try {
-    const draft = await regenerateDraft(id, body.notes ?? null, body.mode ?? "researched");
+    charge = await chargeForDraft(tracker, mode, (report as { id: string }).id);
+  } catch (err) {
+    if (err instanceof BillingError) {
+      return NextResponse.json({ error: err.message, upgrade: err.upgrade }, { status: err.status });
+    }
+    return NextResponse.json({ error: "We couldn't check your credits. Please try again." }, { status: 500 });
+  }
+
+  try {
+    const draft = await regenerateDraft(id, body.notes ?? null, mode);
     return NextResponse.json({ draftId: draft.id, mode: draft.mode });
   } catch (err) {
+    await charge.refund("The page didn't finish").catch((refundErr) => {
+      console.error("draft refund failed", id, refundErr instanceof Error ? refundErr.message : refundErr);
+    });
     // Another request (the daily job, or another tab) is writing this page; the keyword page shows its progress.
     if (err instanceof DraftInProgressError) return NextResponse.json({ error: err.message }, { status: 409 });
+    if (err instanceof OwnKeysMissingError) {
+      return NextResponse.json({ error: err.message, settings: true }, { status: 422 });
+    }
     const message = err instanceof Error ? err.message : "Something went wrong writing your draft.";
     return NextResponse.json({ error: message }, { status: 500 });
   }

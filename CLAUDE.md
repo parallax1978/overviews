@@ -19,6 +19,10 @@ The full product plan is in `PLAN.md`. Read it before changing product behavior.
   `lib/supabase/admin.ts` (service role, server only, bypasses RLS).
 - DataForSEO SERP API for AI Overview capture: `lib/dataforseo.ts`.
 - Anthropic SDK (`claude-opus-5-5`) for analysis and writing: `lib/claude.ts`.
+- Billing: plans and credit prices in `lib/plans.ts` (pure); credits, refunds and the daily spend
+  ceiling in `lib/billing.ts` (atomic SQL functions from `0006_billing.sql`, service role only);
+  users' own API keys in `lib/own-keys.ts` (encrypted with `lib/crypto.ts`); Stripe in `lib/stripe.ts`
+  and `lib/stripe-sync.ts` (webhook at `/api/stripe/webhook`, setup via `scripts/stripe-setup.ts`).
 - Vercel hosting + Vercel Cron (`vercel.json` -> `/api/cron/capture`, daily).
 
 ## Rules
@@ -31,6 +35,10 @@ The full product plan is in `PLAN.md`. Read it before changing product behavior.
 - Server code that writes `snapshots`, `analyses`, `drafts` uses the admin client **after**
   verifying the caller owns the tracker (or from the cron, which is secret-protected).
 - Env vars are read through `lib/env.ts` only.
+- Credits are charged and refunded on the server only. Browsers can read their own `accounts`,
+  `credit_ledger` and keywords, but create and change keywords only through server code
+  (`0007_tracker_writes_server_only.sql`). A keyword's `billing_source` decides whose keys its API calls
+  use and whether they cost credits.
 - Commit messages: imperative, one line summary, blank line, details.
 
 ## Commands

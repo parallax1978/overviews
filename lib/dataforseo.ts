@@ -34,6 +34,21 @@ export interface CaptureRequest {
   device: "desktop" | "mobile";
 }
 
+/** A DataForSEO API login and password (the app's own, or a user's). */
+export interface DataForSeoCredentials {
+  login: string;
+  password: string;
+}
+
+/** The app's own DataForSEO account, from the environment. */
+export function platformDataForSeoCredentials(): DataForSeoCredentials {
+  return { login: serverEnv.dataforseoLogin, password: serverEnv.dataforseoPassword };
+}
+
+function basicAuth(credentials: DataForSeoCredentials): string {
+  return `Basic ${Buffer.from(`${credentials.login}:${credentials.password}`).toString("base64")}`;
+}
+
 export interface CaptureResult {
   hasOverview: boolean;
   /** The `ai_overview` SERP item, untouched. */
@@ -97,11 +112,14 @@ const TASK_RETRY_WINDOW_MS = 60_000;
  * Retries a network error or HTTP 5xx once, and a retryable task error
  * (see isRetryableTaskError) up to twice more.
  */
-export async function fetchSerpWithAiOverview(req: CaptureRequest): Promise<CaptureResult> {
+export async function fetchSerpWithAiOverview(
+  req: CaptureRequest,
+  credentials: DataForSeoCredentials = platformDataForSeoCredentials(),
+): Promise<CaptureResult> {
   const startedAt = Date.now();
   for (let attempt = 0; ; attempt++) {
     try {
-      return await fetchSerpOnce(req);
+      return await fetchSerpOnce(req, credentials);
     } catch (err) {
       const retry =
         err instanceof DataForSeoError &&
@@ -115,14 +133,11 @@ export async function fetchSerpWithAiOverview(req: CaptureRequest): Promise<Capt
 }
 
 /** One live SERP request: HTTP-level retry only. */
-async function fetchSerpOnce(req: CaptureRequest): Promise<CaptureResult> {
-  const auth = Buffer.from(`${serverEnv.dataforseoLogin}:${serverEnv.dataforseoPassword}`).toString(
-    "base64",
-  );
+async function fetchSerpOnce(req: CaptureRequest, credentials: DataForSeoCredentials): Promise<CaptureResult> {
   const init: RequestInit = {
     method: "POST",
     headers: {
-      Authorization: `Basic ${auth}`,
+      Authorization: basicAuth(credentials),
       "Content-Type": "application/json",
       Accept: "application/json",
     },
@@ -130,7 +145,7 @@ async function fetchSerpOnce(req: CaptureRequest): Promise<CaptureResult> {
     cache: "no-store",
   };
 
-  const response = await postWithRetry(init);
+  const response = await postWithRetry(API_URL, init);
   const json: unknown = await response.json().catch(() => null);
   if (!isDict(json)) {
     throw new DataForSeoError(response.status, `Unexpected response (HTTP ${response.status})`);
@@ -162,13 +177,13 @@ async function fetchSerpOnce(req: CaptureRequest): Promise<CaptureResult> {
   };
 }
 
-/** POST with a 90s timeout; retries once after 1.5s on a network error or HTTP 5xx. */
-async function postWithRetry(init: RequestInit): Promise<Response> {
+/** One request with a 50s timeout; retries once after 1.5s on a network error or HTTP 5xx. */
+async function postWithRetry(url: string, init: RequestInit): Promise<Response> {
   let lastError: DataForSeoError | null = null;
   for (let attempt = 1; attempt <= 2; attempt++) {
     if (attempt > 1) await sleep(RETRY_DELAY_MS);
     try {
-      const response = await postOnce(init);
+      const response = await postOnce(url, init);
       if (response.status < 500) return response;
       lastError = new DataForSeoError(response.status, `HTTP ${response.status} from DataForSEO`);
     } catch (err) {
@@ -180,12 +195,48 @@ async function postWithRetry(init: RequestInit): Promise<Response> {
   throw lastError ?? new DataForSeoError(0, "Request failed");
 }
 
-async function postOnce(init: RequestInit): Promise<Response> {
+async function postOnce(url: string, init: RequestInit): Promise<Response> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
   try {
-    return await fetch(API_URL, { ...init, signal: controller.signal });
+    return await fetch(url, { ...init, signal: controller.signal });
   } finally {
     clearTimeout(timer);
   }
+}
+
+/** Endpoint path recorded in api_log rows for the account check. */
+export const DATAFORSEO_ACCOUNT_ENDPOINT = "appendix/user_data";
+
+export interface DataForSeoAccountCheck {
+  /** Money left on the account, in USD. */
+  balanceUsd: number | null;
+}
+
+/**
+ * Checks a DataForSEO login with the free account endpoint and returns the
+ * balance. Throws DataForSeoError when the login is refused (40100 and
+ * friends) or the service cannot be reached.
+ * Docs: https://docs.dataforseo.com/v3/appendix/user_data/
+ */
+export async function checkDataForSeoAccount(credentials: DataForSeoCredentials): Promise<DataForSeoAccountCheck> {
+  const response = await postWithRetry(`https://api.dataforseo.com/v3/${DATAFORSEO_ACCOUNT_ENDPOINT}`, {
+    method: "GET",
+    headers: { Authorization: basicAuth(credentials), Accept: "application/json" },
+    cache: "no-store",
+  });
+  const json: unknown = await response.json().catch(() => null);
+  if (response.status === 401) throw new DataForSeoError(40100, "Login or password not accepted");
+  if (!isDict(json)) throw new DataForSeoError(response.status, `Unexpected response (HTTP ${response.status})`);
+  const topStatus = Number(json.status_code);
+  if (topStatus !== OK) throw new DataForSeoError(topStatus || response.status, String(json.status_message ?? "Request failed"));
+  const task = Array.isArray(json.tasks) ? json.tasks[0] : null;
+  if (!isDict(task) || Number(task.status_code) !== OK) {
+    const code = isDict(task) ? Number(task.status_code) : topStatus;
+    throw new DataForSeoError(code, isDict(task) ? String(task.status_message ?? "Task failed") : "No task in response");
+  }
+  const result = Array.isArray(task.result) ? task.result[0] : null;
+  const money = isDict(result) && isDict(result.money) ? result.money : null;
+  const balance = money ? Number(money.balance) : NaN;
+  return { balanceUsd: Number.isFinite(balance) ? balance : null };
 }

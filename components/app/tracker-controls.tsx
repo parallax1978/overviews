@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { LoaderCircle, Pause, Play, RefreshCw, Trash } from "lucide-react";
@@ -26,15 +27,20 @@ export function TrackerControls({ tracker }: { tracker: Pick<Tracker, "id" | "st
   const [pending, startTransition] = useTransition();
   const [busy, setBusy] = useState<Action | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [upgrade, setUpgrade] = useState(false);
 
   function run(action: Action, work: () => Promise<TrackerActionResult>) {
     if (pending) return;
     setBusy(action);
     setError(null);
+    setUpgrade(false);
     startTransition(async () => {
       try {
         const result = await work();
-        if (!result.ok) setError(result.error);
+        if (!result.ok) {
+          setError(result.error);
+          setUpgrade(result.upgrade === true);
+        }
       } catch {
         setError("Something went wrong. Please try again.");
       } finally {
@@ -128,6 +134,14 @@ export function TrackerControls({ tracker }: { tracker: Pick<Tracker, "id" | "st
       {error ? (
         <p role="alert" className="text-xs text-bad">
           {error}
+          {upgrade ? (
+            <>
+              {" "}
+              <Link href="/app/billing" className="font-semibold underline underline-offset-2">
+                See plans
+              </Link>
+            </>
+          ) : null}
         </p>
       ) : null}
     </div>

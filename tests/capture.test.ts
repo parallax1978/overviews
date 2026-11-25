@@ -205,7 +205,7 @@ function fakeAdmin(tables: Tables) {
 
 const mocks = vi.hoisted(() => ({
   admin: null as unknown,
-  fetchSerp: vi.fn<(req: unknown) => Promise<CaptureResult>>(),
+  fetchSerp: vi.fn<(req: unknown, credentials?: unknown) => Promise<CaptureResult>>(),
 }));
 
 vi.mock("@/lib/supabase/admin", () => ({ createAdminClient: () => mocks.admin }));
@@ -217,6 +217,22 @@ vi.mock("@/lib/analyze", () => ({
 vi.mock("@/lib/dataforseo", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/lib/dataforseo")>();
   return { ...actual, fetchSerpWithAiOverview: mocks.fetchSerp };
+});
+// Billing is covered by tests/billing.test.ts: here every keyword runs on the
+// app's keys for a staff account, so plans and credits never get in the way.
+vi.mock("@/lib/own-keys", () => ({
+  dataforseoCredentialsFor: async () => ({ login: "test-login", password: "test-password" }),
+}));
+vi.mock("@/lib/billing", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/billing")>();
+  const staff = (userId: string) => ({ ...actual.freeAccount(userId), plan: "staff" as const });
+  return {
+    ...actual,
+    getAccount: async (userId: string) => staff(userId),
+    getAccounts: async (userIds: string[]) => new Map(userIds.map((id) => [id, staff(id)])),
+    assertPlatformBudget: async () => {},
+    refundKeywordCharge: vi.fn(async () => false),
+  };
 });
 
 const { captureSnapshot, runDueCaptures } = await import("@/lib/capture");
@@ -341,12 +357,16 @@ describe("captureSnapshot", () => {
     const { snapshots, tracker: after } = await captureSnapshot(TRACKER_ID, { dayNumber: 1 });
 
     expect(mocks.fetchSerp).toHaveBeenCalledTimes(SAMPLES_PER_DAY);
-    expect(mocks.fetchSerp).toHaveBeenCalledWith({
-      keyword: "best form builder",
-      location_code: 2840,
-      language_code: "en",
-      device: "desktop",
-    });
+    // Each request goes out with the keyword's own credentials (here the stubbed app login).
+    expect(mocks.fetchSerp).toHaveBeenCalledWith(
+      {
+        keyword: "best form builder",
+        location_code: 2840,
+        language_code: "en",
+        device: "desktop",
+      },
+      { login: "test-login", password: "test-password" },
+    );
 
     expect(snapshots.map((s) => s.sample)).toEqual([1, 2, 3]);
     expect(snapshots.every((s) => s.day_number === 1 && s.has_overview && s.tracker_id === TRACKER_ID)).toBe(true);
@@ -375,6 +395,8 @@ describe("captureSnapshot", () => {
         endpoint: "serp/google/organic/live/advanced",
         status: 200,
         error: null,
+        billing_source: "platform",
+        user_id: "user-1",
       });
       expect(typeof row.duration_ms).toBe("number");
     }
@@ -594,7 +616,15 @@ describe("runDueCaptures pending reports", () => {
     const summary = await runDueCaptures({ now });
 
     expect(runAnalysis).not.toHaveBeenCalled();
-    expect(summary).toEqual({ recovered: [], captured: [], failed: [], analyzed: [], analysisFailed: [] });
+    expect(summary).toEqual({
+      recovered: [],
+      captured: [],
+      failed: [],
+      analyzed: [],
+      analysisFailed: [],
+      skipped: [],
+      refunded: [],
+    });
   });
 
   it("gives the pending slot to the oldest ready keyword that has an overview and no report", async () => {

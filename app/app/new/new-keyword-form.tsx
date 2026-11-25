@@ -1,11 +1,23 @@
 "use client";
 
+import Link from "next/link";
 import { LoaderCircle, Sparkles } from "lucide-react";
 import { useActionState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { CREDIT_COSTS, creditsLabel } from "@/lib/plans";
 import { LANGUAGES, LOCATIONS, SAMPLES_PER_DAY } from "@/lib/types";
 import { createTrackerAction } from "./actions";
+
+/** How the user can pay for a keyword right now. At least one of `credits` and `ownKeys` is true. */
+export interface PaymentChoice {
+  /** Plan credits can pay: an active plan with enough credits, or the staff plan. */
+  credits: boolean;
+  staff: boolean;
+  balance: number;
+  /** Both own keys are saved. */
+  ownKeys: boolean;
+}
 
 const DEFAULT_LOCATION_CODE = 2840;
 const DEFAULT_LANGUAGE_CODE = "en";
@@ -17,8 +29,50 @@ const textareaClass = `mt-1.5 min-h-28 py-3 ${fieldClass}`;
 const labelClass = "block text-sm font-semibold text-ink";
 const helpClass = "mt-1.5 text-sm text-ink-muted";
 
+const choiceClass =
+  "flex cursor-pointer items-start gap-3 rounded-xl border border-line px-4 py-3 text-sm has-[:checked]:border-brand has-[:checked]:bg-brand-faint";
+
+/** "Who pays for this keyword?": plan credits or the user's own keys, whichever they have. */
+function PaymentFields({ payment }: { payment: PaymentChoice }) {
+  const creditsText = payment.staff
+    ? "Included with your staff plan."
+    : `Uses ${creditsLabel(CREDIT_COSTS.newKeyword)} for the whole week. You have ${payment.balance}.`;
+  if (!payment.credits || !payment.ownKeys) {
+    const source = payment.credits ? "platform" : "own_keys";
+    return (
+      <div>
+        <input type="hidden" name="billing_source" value={source} />
+        <p className="text-sm text-ink-muted">
+          {payment.credits ? creditsText : "Runs on your own API keys, free. DataForSEO and Anthropic bill you directly."}
+        </p>
+      </div>
+    );
+  }
+  return (
+    <fieldset>
+      <legend className={labelClass}>Who pays for it?</legend>
+      <div className="mt-2 space-y-2">
+        <label className={choiceClass}>
+          <input type="radio" name="billing_source" value="platform" defaultChecked className="mt-1 accent-brand" />
+          <span>
+            <span className="font-medium text-ink">My plan&apos;s credits</span>
+            <span className="block text-ink-muted">{creditsText}</span>
+          </span>
+        </label>
+        <label className={choiceClass}>
+          <input type="radio" name="billing_source" value="own_keys" className="mt-1 accent-brand" />
+          <span>
+            <span className="font-medium text-ink">My own API keys</span>
+            <span className="block text-ink-muted">Free here. DataForSEO and Anthropic bill you directly.</span>
+          </span>
+        </label>
+      </div>
+    </fieldset>
+  );
+}
+
 /** The "Add keyword" form. Submits to createTrackerAction, which captures day 1 and redirects to the keyword page. */
-export function NewKeywordForm({ initialKeyword = "" }: { initialKeyword?: string }) {
+export function NewKeywordForm({ initialKeyword = "", payment }: { initialKeyword?: string; payment: PaymentChoice }) {
   const [state, formAction, pending] = useActionState(createTrackerAction, null);
 
   return (
@@ -137,11 +191,29 @@ export function NewKeywordForm({ initialKeyword = "" }: { initialKeyword?: strin
             </label>
           </div>
         </fieldset>
+
+        <PaymentFields payment={payment} />
       </Card>
 
       {state?.error ? (
         <p role="alert" className="text-sm font-medium text-bad">
           {state.error}
+          {state.upgrade ? (
+            <>
+              {" "}
+              <Link href="/app/billing" className="underline underline-offset-2">
+                See plans and credits
+              </Link>
+            </>
+          ) : null}
+          {state.settings ? (
+            <>
+              {" "}
+              <Link href="/app/settings" className="underline underline-offset-2">
+                Open Settings
+              </Link>
+            </>
+          ) : null}
         </p>
       ) : null}
 

@@ -4,6 +4,10 @@
  * lib/dataforseo.ts and lib/claude.ts. Keep the three in sync.
  */
 
+import type { BillingSource, PlanId } from "@/lib/plans";
+
+export type { BillingSource, PlanId } from "@/lib/plans";
+
 export type TrackerStatus =
   | "tracking" // capturing daily snapshots, not yet at days_target
   | "ready" // days_target reached, analysis not run (or failed)
@@ -26,6 +30,8 @@ export interface Tracker {
   user_edge: string | null;
   /** "avoid": the written page never recommends other brands (default). "compare": it may name them in a fair comparison. */
   competitor_policy: CompetitorPolicy;
+  /** Which keys this keyword's API calls run on: the app's (paid with credits) or the owner's own. */
+  billing_source: BillingSource;
   status: TrackerStatus;
   days_target: number;
   day_count: number;
@@ -215,12 +221,54 @@ export interface Draft {
 /** Row written for every external API call, used for cost reporting. */
 export interface ApiLogInsert {
   tracker_id?: string | null;
-  provider: "dataforseo" | "anthropic";
+  provider: "dataforseo" | "anthropic" | "stripe";
   endpoint: string;
   status: number | null;
   cost_usd: number | null;
   duration_ms: number | null;
   error?: string | null;
+  /** Whose keys made the call. Defaults to "platform". */
+  billing_source?: BillingSource;
+  /** The keyword owner, so per-user spend can be read back. */
+  user_id?: string | null;
+}
+
+/** A user's plan, Stripe link and credit balance (table accounts). */
+export interface Account {
+  user_id: string;
+  plan: PlanId;
+  subscription_status: string | null;
+  stripe_customer_id: string | null;
+  stripe_subscription_id: string | null;
+  current_period_end: string | null;
+  cancel_at_period_end: boolean;
+  credits_balance: number;
+  /** The plan whose monthly credits were granted for the billing period starting granted_period_start. */
+  granted_plan: PlanId | null;
+  granted_period_start: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+/** One credit movement (table credit_ledger). */
+export interface CreditLedgerEntry {
+  id: number;
+  user_id: string;
+  delta: number;
+  balance_after: number;
+  reason: string;
+  tracker_id: string | null;
+  external_id: string | null;
+  note: string | null;
+  created_at: string;
+}
+
+/** What the settings page may show about a user's own keys. Never contains a secret. */
+export interface OwnKeysStatus {
+  dataforseo: { saved: boolean; hint: string | null; checkedAt: string | null };
+  anthropic: { saved: boolean; hint: string | null; workspaceId: string | null; checkedAt: string | null };
+  /** Both keys saved: keywords can run on them. */
+  complete: boolean;
 }
 
 /** Supported countries for the "Add keyword" form (DataForSEO location codes). */

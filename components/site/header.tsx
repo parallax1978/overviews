@@ -12,6 +12,9 @@ export function SiteHeader({ signedIn = false }: { signedIn?: boolean }) {
           <Link href="/#how" className="hidden text-ink-muted hover:text-ink sm:inline">
             How It Works
           </Link>
+          <Link href="/pricing" className="text-ink-muted hover:text-ink">
+            Pricing
+          </Link>
           {signedIn ? (
             <LinkButton href="/app" size="xs">
               Open dashboard

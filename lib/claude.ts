@@ -48,19 +48,43 @@ const DRAFT_MAX_TOKENS = 64000;
 /** Server tools pause the turn after ~10 tool iterations; we resume this many times at most. */
 const MAX_PAUSE_RESUMES = 3;
 
-let client: Anthropic | null = null;
+/** An Anthropic API key and, for user-scoped keys (sk-ant-usr-...), the workspace that pays. */
+export interface AnthropicCredentials {
+  apiKey: string;
+  workspaceId: string | null;
+}
 
-/** Anthropic client, created on first use so importing this module never needs the API key. */
-function getClient(): Anthropic {
-  if (!client) {
-    const workspaceId = serverEnv.anthropicWorkspaceId;
-    client = new Anthropic({
-      apiKey: serverEnv.anthropicApiKey,
-      // User-scoped keys must name the workspace to bill; workspace keys ignore this.
-      ...(workspaceId ? { defaultHeaders: { "anthropic-workspace-id": workspaceId } } : {}),
-    });
+let platformClient: Anthropic | null = null;
+
+function buildClient(credentials: AnthropicCredentials, maxRetries?: number): Anthropic {
+  return new Anthropic({
+    apiKey: credentials.apiKey,
+    // User-scoped keys must name the workspace to bill; workspace keys ignore this.
+    ...(credentials.workspaceId ? { defaultHeaders: { "anthropic-workspace-id": credentials.workspaceId } } : {}),
+    ...(maxRetries !== undefined ? { maxRetries } : {}),
+  });
+}
+
+/**
+ * The client for a call: the user's own key when given, else the app's key
+ * (created on first use, so importing this module never needs the API key).
+ */
+function getClient(credentials?: AnthropicCredentials | null): Anthropic {
+  if (credentials) return buildClient(credentials);
+  if (!platformClient) {
+    platformClient = buildClient({ apiKey: serverEnv.anthropicApiKey, workspaceId: serverEnv.anthropicWorkspaceId });
   }
-  return client;
+  return platformClient;
+}
+
+/**
+ * Checks that a key can use the model, with the free Models API. Throws the
+ * SDK's typed errors: AuthenticationError (key refused), PermissionDeniedError
+ * (key or workspace not allowed), NotFoundError (model not available to it).
+ */
+export async function checkAnthropicKey(credentials: AnthropicCredentials): Promise<{ model: string }> {
+  const model = await buildClient(credentials, 1).models.retrieve(CLAUDE_MODEL);
+  return { model: model.id };
 }
 
 // ---------------------------------------------------------------------------
@@ -183,6 +207,8 @@ export interface AnalysisHooks {
   onStep?: (step: string) => void | Promise<void>;
   /** Thinking depth for this report; defaults to REPORT_EFFORT. */
   effort?: ClaudeEffort;
+  /** The keyword owner's own key; null or omitted uses the app's key. */
+  credentials?: AnthropicCredentials | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -249,6 +275,7 @@ interface StructuredCall<S extends z.ZodType> {
   effort: ClaudeEffort;
   tools?: Anthropic.Beta.BetaToolUnion[];
   onBlockStart?: (block: ContentBlockStart) => void;
+  credentials?: AnthropicCredentials | null;
 }
 
 interface StructuredResult<T> {
@@ -387,7 +414,7 @@ function webSearchTool(opts: { maxUses: number }): Anthropic.Beta.BetaWebSearchT
  * together with the tools in use.
  */
 async function runStructured<S extends z.ZodType>(call: StructuredCall<S>): Promise<StructuredResult<z.infer<S>>> {
-  const api = getClient();
+  const api = getClient(call.credentials);
   const messages: Anthropic.Beta.BetaMessageParam[] = [{ role: "user", content: call.userPrompt }];
   // Keep only the JSON schema the helper derives: without its parse hook the SDK
   // leaves the final message alone, so refusals and max_tokens stops reach
@@ -476,6 +503,7 @@ export async function analyzeOverviews(input: AnalysisInput, hooks: AnalysisHook
     schema: AnalysisSchema,
     maxTokens: ANALYSIS_MAX_TOKENS,
     effort: hooks.effort ?? REPORT_EFFORT,
+    credentials: hooks.credentials,
     tools: [webFetchTool({ maxUses: MAX_FETCH_CANDIDATES, maxContentTokens: 12000 })],
     onBlockStart: (block) => {
       if (block.type === "server_tool_use") void report(1);
@@ -500,7 +528,7 @@ export async function analyzeOverviews(input: AnalysisInput, hooks: AnalysisHook
  */
 export async function writeDraft(
   input: DraftInput,
-  opts: { effort?: ClaudeEffort } = {},
+  opts: { effort?: ClaudeEffort; credentials?: AnthropicCredentials | null } = {},
 ): Promise<DraftOutput> {
   const researched = input.mode === "researched";
   const { parsed, usage, model } = await runStructured({
@@ -509,6 +537,7 @@ export async function writeDraft(
     schema: DraftSchema,
     maxTokens: DRAFT_MAX_TOKENS,
     effort: opts.effort ?? DRAFT_EFFORT,
+    credentials: opts.credentials,
     ...(researched
       ? {
           tools: [

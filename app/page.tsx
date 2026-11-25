@@ -6,6 +6,7 @@ import {
   PenLine,
   Sparkles,
 } from "lucide-react";
+import Link from "next/link";
 import { getUser } from "@/lib/auth";
 import { SiteHeader } from "@/components/site/header";
 import { Footer } from "@/components/site/footer";
@@ -204,7 +205,12 @@ export default async function LandingPage() {
                 <ChevronRight className="h-5 w-5" />
               </LinkButton>
             </div>
-            <p className="mt-4 text-sm text-white/60">No password. Cancel any time.</p>
+            <p className="mt-4 text-sm text-white/60">
+              Free on your own API keys, or from $19 a month on ours.{" "}
+              <Link href="/pricing" className="font-medium text-white underline-offset-4 hover:underline">
+                See pricing
+              </Link>
+            </p>
           </div>
         </section>
       </main>

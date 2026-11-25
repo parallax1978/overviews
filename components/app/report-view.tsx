@@ -11,6 +11,7 @@ import {
   TriangleAlert,
 } from "lucide-react";
 import { AnalyzeButton } from "@/components/app/analyze-button";
+import { CREDIT_COSTS, creditsLabel, NO_OVERVIEW_REFUND } from "@/lib/plans";
 import { Card } from "@/components/ui/card";
 import { Chip } from "@/components/ui/chip";
 import { Eyebrow } from "@/components/ui/eyebrow";
@@ -34,6 +35,10 @@ export interface ReportViewProps {
   dayCount: number;
   /** All days are in and the report predates the newest capture: offer a fresh one. */
   staleReport?: boolean;
+  /** Another report costs credits (a keyword on the app's keys, outside the staff plan). */
+  chargesCredits?: boolean;
+  /** A fresh report is built by itself once all days are in, even after an early one (keywords on your own keys). */
+  updatesAtTarget?: boolean;
 }
 
 const REPORT_CONTENTS = [
@@ -52,7 +57,11 @@ export function ReportView({
   daysWithOverview = 0,
   dayCount,
   staleReport = false,
+  chargesCredits = false,
+  updatesAtTarget = true,
 }: ReportViewProps) {
+  // The first finished report is part of the keyword; another one is an update.
+  const updateCost = chargesCredits ? CREDIT_COSTS.reportUpdate : 0;
   if (tracker.status === "analyzing" || analysis?.status === "running") {
     return <Progress step={analysis?.step ?? null} />;
   }
@@ -62,7 +71,9 @@ export function ReportView({
   const reason =
     snapshotsWithOverview < 1
       ? allDaysIn
-        ? `No AI Overview appeared on any of the ${tracker.days_target} days. This search may not show one. Try a different search.`
+        ? `No AI Overview appeared on any of the ${tracker.days_target} days. This search may not show one. Try a different search.${
+            chargesCredits ? ` ${NO_OVERVIEW_REFUND} of your credits came back.` : ""
+          }`
         : "No AI Overview has appeared for this search yet. We need at least one sample with one."
       : null;
 
@@ -84,6 +95,7 @@ export function ReportView({
           canAnalyze={canAnalyze}
           reason={reason}
           label={analysis?.status === "error" ? "Try again" : "Analyze now"}
+          earlyNote={earlyReportNote(tracker.days_target, chargesCredits, updatesAtTarget)}
         />
       </div>
     );
@@ -107,7 +119,7 @@ export function ReportView({
               <p className="mt-1">{analysis.error ?? "Something went wrong while writing it."}</p>
             </div>
           </div>
-          <AnalyzeButton trackerId={tracker.id} disabled={false} reason={null} label="Try again" />
+          <AnalyzeButton trackerId={tracker.id} disabled={false} reason={null} label="Try again" cost={updateCost} />
         </div>
       ) : staleReport ? (
         <Card className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -117,7 +129,13 @@ export function ReportView({
               This report was built before the last captures. A fresh one uses every sample from every day.
             </p>
           </div>
-          <AnalyzeButton trackerId={tracker.id} disabled={false} reason={null} label="Update the report" />
+          <AnalyzeButton
+            trackerId={tracker.id}
+            disabled={false}
+            reason={null}
+            label="Update the report"
+            cost={updateCost}
+          />
         </Card>
       ) : null}
       <Report
@@ -133,18 +151,31 @@ export function ReportView({
 // ---------------------------------------------------------------------------
 // Before the report
 
+/** What building the report before the last day means for this keyword. */
+function earlyReportNote(daysTarget: number, chargesCredits: boolean, updatesAtTarget: boolean): string {
+  if (updatesAtTarget) {
+    return `Can't wait? You can get a first report from today's samples. Patterns get clearer with every day, and we write a fresh report once all ${daysTarget} days are in.`;
+  }
+  if (chargesCredits) {
+    return `Can't wait? Build it now from the days so far. It is the report this keyword includes, so updating it once all ${daysTarget} days are in uses ${creditsLabel(CREDIT_COSTS.reportUpdate)}.`;
+  }
+  return `Can't wait? Build it now from the days so far. Patterns get clearer with every day, and you can update it once all ${daysTarget} days are in.`;
+}
+
 function Intro({
   tracker,
   dayCount,
   canAnalyze,
   reason,
   label,
+  earlyNote,
 }: {
   tracker: Pick<Tracker, "id" | "status" | "days_target">;
   dayCount: number;
   canAnalyze: boolean;
   reason: string | null;
   label: string;
+  earlyNote: string;
 }) {
   const allDaysIn = tracker.status === "ready" || dayCount >= tracker.days_target;
   return (
@@ -170,10 +201,7 @@ function Intro({
       )}
       <div className="mt-6 border-t border-line pt-5">
         {allDaysIn ? null : (
-          <p className="mb-3 text-sm text-ink-muted">
-            Can&apos;t wait? You can get a first report from today&apos;s samples. Patterns get clearer with
-            every day, and we write a fresh report once all {tracker.days_target} days are in.
-          </p>
+          <p className="mb-3 text-sm text-ink-muted">{earlyNote}</p>
         )}
         <AnalyzeButton trackerId={tracker.id} disabled={!canAnalyze} reason={reason} label={label} />
       </div>

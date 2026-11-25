@@ -7,7 +7,9 @@ import { Button } from "@/components/ui/button";
 import { Card, Panel } from "@/components/ui/card";
 import { Eyebrow } from "@/components/ui/eyebrow";
 import { Markdown } from "@/components/ui/markdown";
+import { ApiErrorText, readApiError, type ApiError } from "@/components/app/api-error";
 import { DraftAutoStart, DraftPendingCard } from "@/components/app/draft-auto-start";
+import { creditsLabel, draftCreditCost } from "@/lib/plans";
 import type { Draft, DraftMode, DraftSource } from "@/lib/types";
 import { cn, domainFromUrl } from "@/lib/utils";
 
@@ -29,6 +31,8 @@ export interface DraftViewProps {
   autoStart?: string | null;
   /** The server says the ready-to-publish version is being written right now (by the cron or another tab). */
   writing?: boolean;
+  /** Writing costs credits (a keyword on the app's keys, outside the staff plan): buttons show the cost. */
+  chargesCredits?: boolean;
 }
 
 const MODES: DraftMode[] = ["researched", "placeholders"];
@@ -74,10 +78,17 @@ export function DraftView({
   canRegenerate,
   autoStart = null,
   writing = false,
+  chargesCredits = false,
 }: DraftViewProps) {
   const [mode, setMode] = useState<DraftMode>(() => defaultMode(drafts));
   const writer = useDraftWriter(trackerId);
   const draft = drafts[mode];
+  // What the next draft of this version costs: the report's first ready-to-publish page is included.
+  const cost = draftCreditCost({
+    billingSource: chargesCredits ? "platform" : "own_keys",
+    mode,
+    hasResearchedDraft: drafts.researched !== null,
+  });
 
   if (!drafts.researched && !drafts.placeholders && !canRegenerate) {
     return (
@@ -101,13 +112,20 @@ export function DraftView({
       </div>
 
       {draft ? (
-        <DraftBody draft={draft} mode={mode} keyword={keyword} writer={writer} canRegenerate={canRegenerate} />
+        <DraftBody
+          draft={draft}
+          mode={mode}
+          keyword={keyword}
+          writer={writer}
+          canRegenerate={canRegenerate}
+          cost={cost}
+        />
       ) : mode === "researched" && writing ? (
         <DraftPendingCard />
       ) : mode === "researched" && autoStart ? (
         <DraftAutoStart trackerId={trackerId} analysisId={autoStart} />
       ) : (
-        <MissingVersion mode={mode} writer={writer} canRegenerate={canRegenerate} />
+        <MissingVersion mode={mode} writer={writer} canRegenerate={canRegenerate} cost={cost} />
       )}
     </div>
   );
@@ -119,7 +137,7 @@ export function DraftView({
 interface DraftWriter {
   /** The version being written right now, or null. */
   writing: DraftMode | null;
-  error: { mode: DraftMode; message: string } | null;
+  error: { mode: DraftMode; detail: ApiError } | null;
   clearError: () => void;
   /** Asks the server for a new draft of `mode`; resolves true once it was written and the page refreshed. */
   write: (mode: DraftMode, notes?: string) => Promise<boolean>;
@@ -149,7 +167,10 @@ function useDraftWriter(trackerId: string): DraftWriter {
           body: JSON.stringify(notes ? { mode, notes } : { mode }),
         });
         if (!response.ok) {
-          setError({ mode, message: await readError(response) });
+          setError({
+            mode,
+            detail: await readApiError(response, "Something went wrong writing your draft. Please try again."),
+          });
           return false;
         }
         router.refresh();
@@ -157,7 +178,11 @@ function useDraftWriter(trackerId: string): DraftWriter {
       } catch {
         setError({
           mode,
-          message: "We lost the connection. Refresh the page in a minute to see whether the new version arrived.",
+          detail: {
+            message: "We lost the connection. Refresh the page in a minute to see whether the new version arrived.",
+            upgrade: false,
+            settings: false,
+          },
         });
         return false;
       } finally {
@@ -217,12 +242,14 @@ function DraftBody({
   keyword,
   writer,
   canRegenerate,
+  cost,
 }: {
   draft: Draft;
   mode: DraftMode;
   keyword: string;
   writer: DraftWriter;
   canRegenerate: boolean;
+  cost: number;
 }) {
   const content = draft.content_md ?? "";
   const placeholderCount = mode === "placeholders" ? countPlaceholders(content) : 0;
@@ -241,7 +268,7 @@ function DraftBody({
           <Download className="h-4 w-4" aria-hidden="true" />
           Download .md
         </Button>
-        {canRegenerate ? <RegenerateForm mode={mode} writer={writer} /> : null}
+        {canRegenerate ? <RegenerateForm mode={mode} writer={writer} cost={cost} /> : null}
       </div>
 
       <Panel className="divide-y divide-line">
@@ -284,14 +311,16 @@ function MissingVersion({
   mode,
   writer,
   canRegenerate,
+  cost,
 }: {
   mode: DraftMode;
   writer: DraftWriter;
   canRegenerate: boolean;
+  cost: number;
 }) {
   const pending = writer.writing === mode;
   const busy = writer.writing !== null;
-  const error = writer.error?.mode === mode ? writer.error.message : null;
+  const error = writer.error?.mode === mode ? writer.error.detail : null;
 
   const title =
     mode === "researched"
@@ -316,7 +345,7 @@ function MissingVersion({
               ) : (
                 <PenLine className="h-4 w-4" aria-hidden="true" />
               )}
-              {pending ? "Writing…" : "Write this version"}
+              {pending ? "Writing…" : cost > 0 ? `Write this version · ${creditsLabel(cost)}` : "Write this version"}
             </Button>
             <span className="text-xs text-ink-muted" aria-live="polite">
               {pending ? `${MODE_DURATION[mode]} The page updates by itself.` : MODE_DURATION[mode]}
@@ -328,19 +357,19 @@ function MissingVersion({
       </div>
       {error ? (
         <p role="alert" className="mt-3 text-sm text-bad">
-          {error}
+          <ApiErrorText error={error} />
         </p>
       ) : null}
     </Card>
   );
 }
 
-function RegenerateForm({ mode, writer }: { mode: DraftMode; writer: DraftWriter }) {
+function RegenerateForm({ mode, writer, cost }: { mode: DraftMode; writer: DraftWriter; cost: number }) {
   const [open, setOpen] = useState(false);
   const [notes, setNotes] = useState("");
   const pending = writer.writing === mode;
   const busy = writer.writing !== null;
-  const error = writer.error?.mode === mode ? writer.error.message : null;
+  const error = writer.error?.mode === mode ? writer.error.detail : null;
 
   async function submit() {
     if (busy) return;
@@ -388,7 +417,7 @@ function RegenerateForm({ mode, writer }: { mode: DraftMode; writer: DraftWriter
               ) : (
                 <PenLine className="h-4 w-4" aria-hidden="true" />
               )}
-              {pending ? "Writing…" : "Write a new draft"}
+              {pending ? "Writing…" : cost > 0 ? `Write a new draft · ${creditsLabel(cost)}` : "Write a new draft"}
             </Button>
             <Button size="sm" variant="ghost" onClick={close} disabled={pending}>
               Cancel
@@ -397,7 +426,7 @@ function RegenerateForm({ mode, writer }: { mode: DraftMode; writer: DraftWriter
           </div>
           {error ? (
             <p role="alert" className="mt-2 text-sm text-bad">
-              {error}
+              <ApiErrorText error={error} />
             </p>
           ) : null}
         </Panel>
@@ -544,14 +573,4 @@ function downloadMarkdown(content: string, filename: string): void {
   link.click();
   link.remove();
   setTimeout(() => URL.revokeObjectURL(url), 1000);
-}
-
-async function readError(response: Response): Promise<string> {
-  try {
-    const body = (await response.json()) as { error?: unknown };
-    if (typeof body.error === "string" && body.error) return body.error;
-  } catch {
-    // Not JSON.
-  }
-  return "Something went wrong writing your draft. Please try again.";
 }

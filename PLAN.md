@@ -32,7 +32,7 @@ Real APIs and real data from the first commit. No mocks.
 | Hosting | Vercel. Vercel Cron for the daily capture. Pro plan recommended (Hobby allows one daily cron with up to 59 min jitter but forbids commercial use). |
 | SERP data | DataForSEO `POST /v3/serp/google/organic/live/advanced` with `load_async_ai_overview: true`. |
 | AI | Anthropic SDK (`@anthropic-ai/sdk`), model `claude-opus-5-5`, adaptive thinking, streaming, structured outputs for JSON, `web_fetch` server tool for reading cited pages. |
-| Billing | Not in v1. Users sign in and use it. Credits/Stripe/Legiit checkout is a later phase. |
+| Billing | Two paths (added after v1). **Free**: the user saves their own DataForSEO and Anthropic keys (checked, then encrypted) and pays those APIs directly. **Paid**: Starter $19 / Pro $49 / Agency $99 a month buy 60 / 170 / 360 credits on the app's keys via Stripe. A keyword costs 18 credits (7-day study, its first report and ready-to-publish page); a report update 18, a page rewrite 6, the with-my-own-data page 2. One credit covers about $0.20 of worst-case API cost, so every plan keeps a margin. Prices and limits live in `lib/plans.ts`. |
 | Scope | Google, desktop, one country + language per keyword (default United States / English). |
 
 ## 2. What the user experiences
@@ -343,7 +343,6 @@ NEXT_PUBLIC_APP_URL=https://...
 - Done when: a new user can go from sign-in to a tracked keyword in under a minute, and the daily cron runs in production.
 
 ### Later (not in v1, decide when v1 works)
-- Billing: credits per keyword via Stripe, or route through Legiit checkout like LegiitKeywords.
 - Email when the report is ready and when the user gets cited (Resend).
 - Mobile SERP tracking, Google AI Mode tracking (DataForSEO has `/v3/serp/google/ai_mode/live/advanced`).
 - Shareable public report links.
@@ -359,6 +358,10 @@ NEXT_PUBLIC_APP_URL=https://...
 | Anthropic + DataForSEO | pay as you go (DataForSEO minimum deposit $50) |
 
 So one keyword, start to finished draft, costs under a dollar in API spend.
+
+Measured in November 2026 at "high" thinking (from `api_log`): a 21-sample report costs $1.86 to $2.38,
+the ready-to-publish page $1.04 to $1.12, the with-my-own-data page $0.24 to $0.33, and a capture about
+$0.0027. A whole keyword is up to about $3.60. These figures set the credit prices in `lib/plans.ts`.
 
 ## 7. What is needed before Phase 1 starts
 

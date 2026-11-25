@@ -23,7 +23,7 @@ export function EmptyState() {
         <h2 className="mt-5 text-2xl font-bold tracking-tight text-ink">
           Add the search you want to win
         </h2>
-        <p className="mt-2 text-ink-muted">It takes about 20 seconds. Nothing to set up.</p>
+        <p className="mt-2 text-ink-muted">It takes about 20 seconds.</p>
 
         <ol className="mx-auto mt-6 max-w-md space-y-3 text-left text-sm text-ink-muted">
           {STEPS.map((step, index) => (

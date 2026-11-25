@@ -67,6 +67,7 @@ export function TrackerCard({ tracker, stats }: { tracker: Tracker; stats: Track
           <p className="mt-1 flex items-center gap-1.5 text-sm text-ink-muted">
             <Globe className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
             {tracker.location_name}
+            {tracker.billing_source === "own_keys" ? <span className="text-ink-soft">· Your own keys</span> : null}
           </p>
 
           {showCited || showError ? (

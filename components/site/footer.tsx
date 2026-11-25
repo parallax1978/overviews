@@ -27,6 +27,9 @@ export function Footer() {
             <Link href="/#how" className="hover:text-ink">
               How It Works
             </Link>
+            <Link href="/pricing" className="hover:text-ink">
+              Pricing
+            </Link>
             <a href="mailto:help@legiit.com" className="hover:text-ink">
               Support
             </a>
