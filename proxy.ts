@@ -7,7 +7,8 @@ export async function proxy(request: NextRequest) {
 
 export const config = {
   matcher: [
-    // Everything except static assets, images, the cron endpoint, Stripe's webhook and the auth callback.
-    "/((?!_next/static|_next/image|favicon.ico|icon.svg|api/cron|api/stripe|auth/confirm|.*\\.(?:svg|png|jpg|jpeg|gif|webp|woff2?)$).*)",
+    // Everything except static assets, images, the cron endpoint, Stripe's webhook, the auth callback
+    // and the Clicky analytics relay (lib/clicky.ts), which never needs a session.
+    "/((?!_next/static|_next/image|favicon.ico|icon.svg|api/cron|api/stripe|auth/confirm|f9bb7dcc08c495e\\.js|dc95495f19525c8|e9415f48c064280|.*\\.(?:svg|png|jpg|jpeg|gif|webp|woff2?)$).*)",
   ],
 };

@@ -33,6 +33,8 @@ The full product plan is in `PLAN.md`. Read it before changing product behavior.
 - Keep it simple for an everyday user: short sentences, no SEO jargon in the UI, one obvious
   next action per screen.
 - Every external API call writes an `api_log` row (provider, endpoint, status, cost, duration).
+  The one exception is the Clicky analytics relay (`lib/clicky.ts`): it passes visitors' own
+  analytics pings through our domain and makes no API calls of its own.
 - Server code that writes `snapshots`, `analyses`, `drafts` uses the admin client **after**
   verifying the caller owns the tracker (or from the cron, which is secret-protected).
 - Env vars are read through `lib/env.ts` only.
