@@ -55,6 +55,18 @@ export const serverEnv = {
   get ownKeysEncryptionKey() {
     return required("OWN_KEYS_ENCRYPTION_KEY");
   },
+  /** GetResponse API key. Null turns adding new users to the mailing list off. */
+  get getresponseApiKey() {
+    return process.env.GETRESPONSE_API_KEY || null;
+  },
+  /** The GetResponse list (campaign id) new users join. */
+  get getresponseListId() {
+    return process.env.GETRESPONSE_LIST_ID || null;
+  },
+  /** Optional GetResponse tag id marking contacts that came from this app. */
+  get getresponseTagId() {
+    return process.env.GETRESPONSE_TAG_ID || null;
+  },
   /** Safety ceiling on the app's own API spend per UTC day; new reports pause above it. */
   get platformDailyLimitUsd() {
     const value = Number(process.env.PLATFORM_DAILY_LIMIT_USD);

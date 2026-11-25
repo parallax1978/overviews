@@ -62,7 +62,8 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
             </div>
           </Card>
           <p className="mt-6 text-center text-xs text-ink-soft">
-            We only use your email to sign you in. Codes expire after one hour.
+            We use your email to sign you in and to send you occasional updates from Legiit. Unsubscribe any time.
+            Codes expire after one hour.
           </p>
         </div>
       </main>

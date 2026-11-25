@@ -223,7 +223,7 @@ export interface Draft {
 /** Row written for every external API call, used for cost reporting. */
 export interface ApiLogInsert {
   tracker_id?: string | null;
-  provider: "dataforseo" | "anthropic" | "stripe" | "google";
+  provider: "dataforseo" | "anthropic" | "stripe" | "google" | "getresponse";
   endpoint: string;
   status: number | null;
   cost_usd: number | null;
@@ -245,6 +245,8 @@ export interface Account {
   current_period_end: string | null;
   cancel_at_period_end: boolean;
   credits_balance: number;
+  /** When the user was added to the GetResponse mailing list; null until then. */
+  marketing_synced_at?: string | null;
   /** The plan whose monthly credits were granted for the billing period starting granted_period_start. */
   granted_plan: PlanId | null;
   granted_period_start: string | null;
