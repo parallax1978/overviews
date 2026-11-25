@@ -220,6 +220,15 @@ vi.mock("@/lib/dataforseo", async (importOriginal) => {
 });
 // Billing is covered by tests/billing.test.ts: here every keyword runs on the
 // app's keys for a staff account, so plans and credits never get in the way.
+// Redirect links are resolved by lib/google-redirect.ts (tests/google-redirect.test.ts); keep links as they are here.
+vi.mock("@/lib/google-redirect", () => ({
+  resolveOverviewLinks: async (o: { references: unknown[]; inlineLinks: unknown[]; markdown: string | null }) => ({
+    ...o,
+    found: 0,
+    resolved: 0,
+    destinations: new Map(),
+  }),
+}));
 vi.mock("@/lib/own-keys", () => ({
   dataforseoCredentialsFor: async () => ({ login: "test-login", password: "test-password" }),
 }));

@@ -17,6 +17,7 @@ import {
   fetchSerpWithAiOverview,
 } from "@/lib/dataforseo";
 import { type Comparable, computeDayDiff } from "@/lib/diff";
+import { resolveOverviewLinks } from "@/lib/google-redirect";
 import { dataforseoCredentialsFor } from "@/lib/own-keys";
 import { normalizeAiOverview } from "@/lib/overview";
 import { isPlanActive, keepTrackingLimit, NO_OVERVIEW_REFUND } from "@/lib/plans";
@@ -518,6 +519,22 @@ async function storeSample(
   result: CaptureResult,
 ): Promise<Snapshot> {
   const overview = normalizeAiOverview(result.aiOverviewItem);
+  // Google cites some sources through its own redirect links: store the pages they lead to.
+  const startedAt = Date.now();
+  const links = await resolveOverviewLinks(overview);
+  if (links.found > 0) {
+    await logApiCall(admin, {
+      tracker_id: tracker.id,
+      provider: "google",
+      endpoint: "goto-redirect",
+      status: links.resolved === links.found ? 200 : null,
+      cost_usd: 0,
+      duration_ms: Date.now() - startedAt,
+      error: links.resolved < links.found ? `resolved ${links.resolved} of ${links.found} redirect links` : null,
+      billing_source: tracker.billing_source ?? "platform",
+      user_id: tracker.user_id ?? null,
+    });
+  }
 
   const { data: inserted, error: insertError } = await admin
     .from("snapshots")
@@ -528,9 +545,9 @@ async function storeSample(
       captured_at: new Date().toISOString(),
       has_overview: overview.hasOverview,
       overview_text: overview.text,
-      overview_markdown: overview.markdown,
-      references: overview.references,
-      inline_links: overview.inlineLinks,
+      overview_markdown: links.markdown,
+      references: links.references,
+      inline_links: links.inlineLinks,
       raw: result.raw,
       content_hash: overview.contentHash,
       diff: null,

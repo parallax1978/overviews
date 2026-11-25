@@ -221,7 +221,7 @@ export interface Draft {
 /** Row written for every external API call, used for cost reporting. */
 export interface ApiLogInsert {
   tracker_id?: string | null;
-  provider: "dataforseo" | "anthropic" | "stripe";
+  provider: "dataforseo" | "anthropic" | "stripe" | "google";
   endpoint: string;
   status: number | null;
   cost_usd: number | null;
