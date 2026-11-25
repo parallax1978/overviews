@@ -39,6 +39,8 @@ export interface Tracker {
   keep_tracking: boolean;
   cited_on_day: number | null;
   last_error: string | null;
+  /** Set while the report is shared: anyone with /share/<token> can read it. */
+  share_token: string | null;
   created_at: string;
 }
 

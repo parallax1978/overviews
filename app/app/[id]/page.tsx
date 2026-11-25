@@ -213,7 +213,15 @@ export default async function TrackerPage({ params, searchParams }: PageProps) {
           ) : null}
         </div>
 
-        <TrackerControls tracker={{ id: tracker.id, status: tracker.status, keep_tracking: tracker.keep_tracking }} />
+        <TrackerControls
+          tracker={{
+            id: tracker.id,
+            status: tracker.status,
+            keep_tracking: tracker.keep_tracking,
+            share_token: tracker.share_token ?? null,
+          }}
+          hasReport={report !== null}
+        />
       </div>
 
       <div className="mt-8">

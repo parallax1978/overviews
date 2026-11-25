@@ -1,5 +1,6 @@
 "use server";
 
+import { randomBytes } from "node:crypto";
 import { revalidatePath } from "next/cache";
 import { restingStatus } from "@/lib/analyze";
 import { requireUser } from "@/lib/auth";
@@ -8,6 +9,7 @@ import { captureSnapshot } from "@/lib/capture";
 import { CREDIT_COSTS, isPlanActive, keepTrackingLimit } from "@/lib/plans";
 import { nextCaptureAt } from "@/lib/schedule";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { publicEnv } from "@/lib/env";
 import { createClient } from "@/lib/supabase/server";
 import type { Tracker, TrackerStatus } from "@/lib/types";
 
@@ -17,7 +19,15 @@ export type TrackerActionResult = { ok: true } | { ok: false; error: string; upg
 type UserClient = Awaited<ReturnType<typeof createClient>>;
 type OwnedTracker = Pick<
   Tracker,
-  "id" | "user_id" | "billing_source" | "status" | "day_count" | "days_target" | "keep_tracking" | "next_capture_at"
+  | "id"
+  | "user_id"
+  | "billing_source"
+  | "status"
+  | "day_count"
+  | "days_target"
+  | "keep_tracking"
+  | "next_capture_at"
+  | "share_token"
 >;
 
 const NOT_FOUND: TrackerActionResult = { ok: false, error: "We couldn't find that keyword." };
@@ -33,7 +43,7 @@ async function loadOwned(trackerId: string): Promise<{ supabase: UserClient; tra
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("trackers")
-    .select("id, user_id, billing_source, status, day_count, days_target, keep_tracking, next_capture_at")
+    .select("id, user_id, billing_source, status, day_count, days_target, keep_tracking, next_capture_at, share_token")
     .eq("id", trackerId)
     .maybeSingle();
   if (error) {
@@ -200,4 +210,39 @@ export async function retryFirstCapture(trackerId: string): Promise<TrackerActio
   }
   revalidateTracker(trackerId);
   return { ok: true };
+}
+
+/** The public link for a shared report. */
+function shareUrl(token: string): string {
+  return `${publicEnv.appUrl}/share/${token}`;
+}
+
+/**
+ * Makes the keyword's report readable by anyone with the link (no sign-in), and
+ * returns the link. Sharing again returns the same link.
+ */
+export async function shareReport(trackerId: string): Promise<{ ok: true; url: string } | { ok: false; error: string }> {
+  const { supabase, tracker } = await loadOwned(trackerId);
+  if (!tracker) return NOT_FOUND as { ok: false; error: string };
+  if (tracker.share_token) return { ok: true, url: shareUrl(tracker.share_token) };
+
+  const { data: report } = await supabase
+    .from("analyses")
+    .select("id")
+    .eq("tracker_id", trackerId)
+    .eq("status", "done")
+    .limit(1)
+    .maybeSingle();
+  if (!report) return fail("There's no report to share yet.") as { ok: false; error: string };
+
+  const token = randomBytes(24).toString("base64url");
+  const result = await updateTracker(trackerId, { share_token: token });
+  return result.ok ? { ok: true, url: shareUrl(token) } : (result as { ok: false; error: string });
+}
+
+/** Turns the share link off: it stops working right away. */
+export async function stopSharing(trackerId: string): Promise<TrackerActionResult> {
+  const { tracker } = await loadOwned(trackerId);
+  if (!tracker) return NOT_FOUND;
+  return updateTracker(trackerId, { share_token: null });
 }

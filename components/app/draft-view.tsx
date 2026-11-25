@@ -33,6 +33,8 @@ export interface DraftViewProps {
   writing?: boolean;
   /** Writing costs credits (a keyword on the app's keys, outside the staff plan): buttons show the cost. */
   chargesCredits?: boolean;
+  /** Only show the versions that exist, with no way to write one (the public share page). */
+  readOnly?: boolean;
 }
 
 const MODES: DraftMode[] = ["researched", "placeholders"];
@@ -79,6 +81,7 @@ export function DraftView({
   autoStart = null,
   writing = false,
   chargesCredits = false,
+  readOnly = false,
 }: DraftViewProps) {
   const [mode, setMode] = useState<DraftMode>(() => defaultMode(drafts));
   const writer = useDraftWriter(trackerId);
@@ -89,6 +92,9 @@ export function DraftView({
     mode,
     hasResearchedDraft: drafts.researched !== null,
   });
+
+  const modes = readOnly ? MODES.filter((m) => drafts[m]) : MODES;
+  if (readOnly && modes.length === 0) return null;
 
   if (!drafts.researched && !drafts.placeholders && !canRegenerate) {
     return (
@@ -107,7 +113,7 @@ export function DraftView({
   return (
     <div className="space-y-5">
       <div>
-        <ModeSwitch mode={mode} onChange={setMode} writing={writer.writing} />
+        {modes.length > 1 ? <ModeSwitch modes={modes} mode={mode} onChange={setMode} writing={writer.writing} /> : null}
         <p className="mt-3 text-sm text-ink-muted">{MODE_HELP[mode]}</p>
       </div>
 
@@ -201,17 +207,19 @@ function useDraftWriter(trackerId: string): DraftWriter {
 // ---------------------------------------------------------------------------
 
 function ModeSwitch({
+  modes,
   mode,
   onChange,
   writing,
 }: {
+  modes: DraftMode[];
   mode: DraftMode;
   onChange: (mode: DraftMode) => void;
   writing: DraftMode | null;
 }) {
   return (
     <div role="group" aria-label="Which version of the page to show" className="inline-flex rounded-full bg-surface-sunken p-1">
-      {MODES.map((option) => {
+      {modes.map((option) => {
         const selected = option === mode;
         return (
           <button

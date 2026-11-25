@@ -3,31 +3,57 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
-import { LoaderCircle, Pause, Play, RefreshCw, Trash } from "lucide-react";
+import { Link2, LoaderCircle, Pause, Play, RefreshCw, Trash } from "lucide-react";
 import {
   deleteTracker,
   pauseTracker,
   resumeTracker,
   retryFirstCapture,
   setKeepTracking,
+  shareReport,
+  stopSharing,
   type TrackerActionResult,
 } from "@/app/app/[id]/actions";
 import { Button } from "@/components/ui/button";
 import type { Tracker } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
-type Action = "pause" | "resume" | "keep" | "retry" | "delete";
+type Action = "pause" | "resume" | "keep" | "retry" | "delete" | "share" | "unshare";
 
 const DELETE_PROMPT =
   "Delete this keyword and everything we captured for it? This can't be undone.";
 
 /** Pause / resume, keep-tracking, retry and delete controls for one keyword. */
-export function TrackerControls({ tracker }: { tracker: Pick<Tracker, "id" | "status" | "keep_tracking"> }) {
+export function TrackerControls({
+  tracker,
+  hasReport = false,
+}: {
+  tracker: Pick<Tracker, "id" | "status" | "keep_tracking" | "share_token">;
+  /** A finished report exists, so it can be shared. */
+  hasReport?: boolean;
+}) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [busy, setBusy] = useState<Action | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [upgrade, setUpgrade] = useState(false);
+  const [shared, setShared] = useState<string | null>(null);
+
+  /** Turns the share link on (or reuses it), copies it and shows it. */
+  function share() {
+    run("share", async () => {
+      const result = await shareReport(tracker.id);
+      if (!result.ok) return result;
+      setShared(result.url);
+      try {
+        await navigator.clipboard.writeText(result.url);
+      } catch {
+        // Clipboard blocked: the link is shown below to copy by hand.
+      }
+      router.refresh();
+      return { ok: true };
+    });
+  }
 
   function run(action: Action, work: () => Promise<TrackerActionResult>) {
     if (pending) return;
@@ -113,6 +139,13 @@ export function TrackerControls({ tracker }: { tracker: Pick<Tracker, "id" | "st
           </button>
         ) : null}
 
+        {hasReport ? (
+          <Button size="xs" variant="secondary" disabled={pending} onClick={share}>
+            <Spinner active={busy === "share"} fallback={<Link2 className="h-3.5 w-3.5" aria-hidden="true" />} />
+            {tracker.share_token ? "Copy share link" : "Share report"}
+          </Button>
+        ) : null}
+
         <Button
           size="xs"
           variant="danger"
@@ -130,6 +163,29 @@ export function TrackerControls({ tracker }: { tracker: Pick<Tracker, "id" | "st
           Delete
         </Button>
       </div>
+
+      {shared ? (
+        <p role="status" className="text-xs text-ink-muted">
+          Link copied. Anyone with it can read this report, no sign-in needed:{" "}
+          <a href={shared} target="_blank" rel="noreferrer" className="break-all font-semibold text-brand hover:text-brand-strong">
+            {shared}
+          </a>{" "}
+          <button
+            type="button"
+            className="font-semibold text-ink-muted underline underline-offset-2 hover:text-ink"
+            disabled={pending}
+            onClick={() =>
+              run("unshare", async () => {
+                const result = await stopSharing(tracker.id);
+                if (result.ok) setShared(null);
+                return result;
+              })
+            }
+          >
+            Stop sharing
+          </button>
+        </p>
+      ) : null}
 
       {error ? (
         <p role="alert" className="text-xs text-bad">

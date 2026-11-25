@@ -138,7 +138,7 @@ export function ReportView({
           />
         </Card>
       ) : null}
-      <Report
+      <ReportBody
         tracker={tracker}
         analysis={report}
         snapshotsWithOverview={snapshotsWithOverview}
@@ -233,16 +233,20 @@ function Progress({ step }: { step: string | null }) {
 // ---------------------------------------------------------------------------
 // The report
 
-function Report({
+/** A finished report, read-only. Also used by the public share page. */
+export function ReportBody({
   tracker,
   analysis,
   snapshotsWithOverview,
   daysWithOverview,
+  draftHref,
 }: {
   tracker: Pick<Tracker, "id">;
   analysis: Analysis;
   snapshotsWithOverview: number;
   daysWithOverview: number;
+  /** Where "See the page we wrote" goes; the keyword's Draft tab by default. */
+  draftHref?: string;
 }) {
   const patterns = analysis.patterns;
   const research = analysis.citation_research ?? [];
@@ -588,7 +592,7 @@ function Report({
 
       <div className="mt-8 flex justify-end">
         <Link
-          href={`/app/${tracker.id}?tab=draft`}
+          href={draftHref ?? `/app/${tracker.id}?tab=draft`}
           className="inline-flex items-center gap-1.5 text-sm font-semibold text-brand hover:text-brand-strong"
         >
           See the page we wrote
