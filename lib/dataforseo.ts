@@ -77,8 +77,45 @@ export function buildSerpTask(req: CaptureRequest): Record<string, unknown> {
   };
 }
 
-/** Runs one live SERP request and returns the AI Overview item plus cost. Retries once on network errors and HTTP 5xx. */
+/**
+ * DataForSEO task errors worth retrying: Google's side failed ("Internal SE
+ * Server Error", 40101) or DataForSEO's own did (5xxxx). Neither is charged.
+ * In November 2026 about half of all captures failed with 40101 on the first
+ * try, so a capture without these retries loses whole days.
+ */
+export function isRetryableTaskError(code: number): boolean {
+  return code === 40101 || code >= 50000;
+}
+
+/** Pauses before the second and third attempt after a retryable task error. */
+export const TASK_RETRY_DELAYS_MS = [3_000, 8_000];
+/** No new attempt starts after this long, so the add-keyword action stays inside its time limit. */
+const TASK_RETRY_WINDOW_MS = 60_000;
+
+/**
+ * Runs one live SERP request and returns the AI Overview item plus cost.
+ * Retries a network error or HTTP 5xx once, and a retryable task error
+ * (see isRetryableTaskError) up to twice more.
+ */
 export async function fetchSerpWithAiOverview(req: CaptureRequest): Promise<CaptureResult> {
+  const startedAt = Date.now();
+  for (let attempt = 0; ; attempt++) {
+    try {
+      return await fetchSerpOnce(req);
+    } catch (err) {
+      const retry =
+        err instanceof DataForSeoError &&
+        isRetryableTaskError(err.statusCode) &&
+        attempt < TASK_RETRY_DELAYS_MS.length &&
+        Date.now() - startedAt < TASK_RETRY_WINDOW_MS;
+      if (!retry) throw err;
+      await sleep(TASK_RETRY_DELAYS_MS[attempt]);
+    }
+  }
+}
+
+/** One live SERP request: HTTP-level retry only. */
+async function fetchSerpOnce(req: CaptureRequest): Promise<CaptureResult> {
   const auth = Buffer.from(`${serverEnv.dataforseoLogin}:${serverEnv.dataforseoPassword}`).toString(
     "base64",
   );
