@@ -30,7 +30,9 @@ export async function POST(request: Request) {
   }
   const startedAt = Date.now();
   try {
-    const result = await setupStripe(getStripe(), publicEnv.appUrl);
+    // ?recreateWebhook=1 replaces an endpoint whose signing secret was never saved.
+    const recreateWebhook = new URL(request.url).searchParams.get("recreateWebhook") === "1";
+    const result = await setupStripe(getStripe(), publicEnv.appUrl, { recreateWebhook });
     await logApiCall(createAdminClient(), {
       provider: "stripe",
       endpoint: "setup",

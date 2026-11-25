@@ -1,9 +1,12 @@
 /**
  * Creates (or brings up to date) everything the app needs in a Stripe account:
- * the product, one monthly price per plan in lib/plans.ts (found by lookup
- * key), the webhook endpoint and the customer-portal settings. Safe to run
- * again: after a price change in lib/plans.ts a new price takes over the
+ * one product per plan in lib/plans.ts, each with one monthly price (found by
+ * lookup key), the customer-portal settings and the webhook endpoint. Safe to
+ * run again: after a price change in lib/plans.ts a new price takes over the
  * plan's lookup key and the old one is archived.
+ *
+ * The customer portal only lets customers switch between products whose
+ * prices have different billing intervals, so every plan is its own product.
  *
  * Used by scripts/stripe-setup.ts (from a terminal) and by
  * POST /api/stripe/setup (on the server, where STRIPE_SECRET_KEY lives).
@@ -24,52 +27,79 @@ const WEBHOOK_EVENTS: Stripe.WebhookEndpointCreateParams.EnabledEvent[] = [
 
 export interface StripeSetupResult {
   livemode: boolean;
-  productId: string;
+  products: { plan: string; id: string; created: boolean }[];
   prices: { plan: string; id: string; created: boolean }[];
-  webhook: { id: string; url: string; created: boolean; secret: string | null };
   portalConfigurationId: string;
+  webhook: { id: string; url: string; created: boolean; secret: string | null };
   log: string[];
 }
 
-export async function setupStripe(stripe: Stripe, appUrl: string): Promise<StripeSetupResult> {
+export interface StripeSetupOptions {
+  /**
+   * Delete the app's webhook endpoint and create it again. Stripe shows an
+   * endpoint's signing secret only when it is created, so this is how to get
+   * a secret for an endpoint whose secret was never saved. The old secret
+   * stops working: set the new one as STRIPE_WEBHOOK_SECRET right away.
+   */
+  recreateWebhook?: boolean;
+}
+
+function idOf(ref: string | { id: string }): string {
+  return typeof ref === "string" ? ref : ref.id;
+}
+
+export async function setupStripe(
+  stripe: Stripe,
+  appUrl: string,
+  options: StripeSetupOptions = {},
+): Promise<StripeSetupResult> {
   const log: string[] = [];
   const baseUrl = appUrl.replace(/\/+$/, "");
+  const ours = (await stripe.products.list({ active: true, limit: 100 })).data.filter(
+    (p) => p.metadata?.app === APP_TAG,
+  );
 
-  // 1. The product.
-  const products = await stripe.products.list({ active: true, limit: 100 });
-  let product = products.data.find((p) => p.metadata?.app === APP_TAG);
-  if (!product) {
-    product = await stripe.products.create({
-      name: "Legiit Overviews",
-      description: "Track a search's Google AI Overview for 7 days and get a page built to beat every cited source.",
-      metadata: { app: APP_TAG },
-    });
-    log.push(`Created product ${product.id}`);
-  } else {
-    log.push(`Product ${product.id} already exists`);
+  // 1. One product per plan.
+  const products: StripeSetupResult["products"] = [];
+  const productIds = new Map<string, string>();
+  for (const plan of PAID_PLANS) {
+    let product = ours.find((p) => p.metadata?.plan === plan.id);
+    const created = !product;
+    if (!product) {
+      product = await stripe.products.create({
+        name: `Legiit Overviews ${plan.name}`,
+        description: `${plan.monthlyCredits} credits a month. Track a search's AI Overview for 7 days and get a page built to beat every cited source.`,
+        metadata: { app: APP_TAG, plan: plan.id },
+      });
+      log.push(`Created product for ${plan.name}: ${product.id}`);
+    } else {
+      log.push(`Product for ${plan.name} already exists: ${product.id}`);
+    }
+    products.push({ plan: plan.id, id: product.id, created });
+    productIds.set(plan.id, product.id);
   }
 
-  // 2. One monthly price per plan, by lookup key.
+  // 2. One monthly price per plan, on its product, by lookup key.
   const existing = await stripe.prices.list({ lookup_keys: PAID_PLANS.map((p) => p.stripeLookupKey), limit: 10 });
   const prices: StripeSetupResult["prices"] = [];
   for (const plan of PAID_PLANS) {
     const cents = plan.priceUsd * 100;
+    const productId = productIds.get(plan.id) as string;
     const current = existing.data.find((p) => p.lookup_key === plan.stripeLookupKey);
-    const productId = current ? (typeof current.product === "string" ? current.product : current.product.id) : null;
     const upToDate =
       current &&
       current.active &&
       current.unit_amount === cents &&
       current.currency === "usd" &&
       current.recurring?.interval === "month" &&
-      productId === product.id;
+      idOf(current.product) === productId;
     if (current && upToDate) {
       prices.push({ plan: plan.id, id: current.id, created: false });
       log.push(`Price for ${plan.name} ($${plan.priceUsd}/month) already exists: ${current.id}`);
       continue;
     }
     const price = await stripe.prices.create({
-      product: product.id,
+      product: productId,
       currency: "usd",
       unit_amount: cents,
       recurring: { interval: "month" },
@@ -83,27 +113,17 @@ export async function setupStripe(stripe: Stripe, appUrl: string): Promise<Strip
     log.push(`Created price for ${plan.name} ($${plan.priceUsd}/month): ${price.id}`);
   }
 
-  // 3. The webhook endpoint. Stripe shows its signing secret only when it is created.
-  const webhookUrl = `${baseUrl}/api/stripe/webhook`;
-  const endpoints = await stripe.webhookEndpoints.list({ limit: 100 });
-  const endpoint = endpoints.data.find((e) => e.url === webhookUrl);
-  let webhook: StripeSetupResult["webhook"];
-  if (endpoint) {
-    await stripe.webhookEndpoints.update(endpoint.id, { enabled_events: WEBHOOK_EVENTS, disabled: false });
-    webhook = { id: endpoint.id, url: webhookUrl, created: false, secret: null };
-    log.push(`Webhook ${endpoint.id} already exists; events updated. Its signing secret is unchanged.`);
-  } else {
-    const created = await stripe.webhookEndpoints.create({
-      url: webhookUrl,
-      enabled_events: WEBHOOK_EVENTS,
-      description: "Legiit Overviews billing",
-      metadata: { app: APP_TAG },
-    });
-    webhook = { id: created.id, url: webhookUrl, created: true, secret: created.secret ?? null };
-    log.push(`Created webhook ${created.id} for ${webhookUrl}`);
+  // Archive the app's products that no longer stand for a plan (and their prices).
+  for (const product of ours) {
+    const plan = product.metadata?.plan;
+    if (plan && productIds.get(plan) === product.id) continue;
+    const stale = await stripe.prices.list({ product: product.id, active: true, limit: 100 });
+    for (const price of stale.data) await stripe.prices.update(price.id, { active: false });
+    await stripe.products.update(product.id, { active: false });
+    log.push(`Archived old product ${product.id}`);
   }
 
-  // 4. The customer portal: switch plans (charged right away, prorated), update the card, cancel at period end.
+  // 3. The customer portal: switch plans (charged right away, prorated), update the card, cancel at period end.
   const features: Stripe.BillingPortal.ConfigurationCreateParams.Features = {
     customer_update: { enabled: true, allowed_updates: ["email", "address", "tax_id"] },
     invoice_history: { enabled: true },
@@ -113,7 +133,7 @@ export async function setupStripe(stripe: Stripe, appUrl: string): Promise<Strip
       enabled: true,
       default_allowed_updates: ["price"],
       proration_behavior: "always_invoice",
-      products: [{ product: product.id, prices: prices.map((p) => p.id) }],
+      products: prices.map((p) => ({ product: productIds.get(p.plan) as string, prices: [p.id] })),
     },
   };
   const businessProfile = { headline: "Manage your Legiit Overviews plan" };
@@ -135,5 +155,31 @@ export async function setupStripe(stripe: Stripe, appUrl: string): Promise<Strip
     log.push(`Created customer portal settings ${created.id}`);
   }
 
-  return { livemode: product.livemode, productId: product.id, prices, webhook, portalConfigurationId, log };
+  // 4. The webhook endpoint, last: its signing secret is only shown when it is created.
+  const webhookUrl = `${baseUrl}/api/stripe/webhook`;
+  const endpoints = await stripe.webhookEndpoints.list({ limit: 100 });
+  let endpoint = endpoints.data.find((e) => e.url === webhookUrl) ?? null;
+  if (endpoint && options.recreateWebhook) {
+    await stripe.webhookEndpoints.del(endpoint.id);
+    log.push(`Deleted webhook ${endpoint.id} to create it again`);
+    endpoint = null;
+  }
+  let webhook: StripeSetupResult["webhook"];
+  if (endpoint) {
+    await stripe.webhookEndpoints.update(endpoint.id, { enabled_events: WEBHOOK_EVENTS, disabled: false });
+    webhook = { id: endpoint.id, url: webhookUrl, created: false, secret: null };
+    log.push(`Webhook ${endpoint.id} already exists; events updated. Its signing secret is unchanged.`);
+  } else {
+    const created = await stripe.webhookEndpoints.create({
+      url: webhookUrl,
+      enabled_events: WEBHOOK_EVENTS,
+      description: "Legiit Overviews billing",
+      metadata: { app: APP_TAG },
+    });
+    webhook = { id: created.id, url: webhookUrl, created: true, secret: created.secret ?? null };
+    log.push(`Created webhook ${created.id} for ${webhookUrl}`);
+  }
+
+  const livemode = prices.length > 0 ? (await stripe.prices.retrieve(prices[0].id)).livemode : false;
+  return { livemode, products, prices, portalConfigurationId, webhook, log };
 }
