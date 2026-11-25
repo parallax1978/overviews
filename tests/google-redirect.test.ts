@@ -65,6 +65,7 @@ describe("resolveOverviewLinks", () => {
     const fetchImpl = fakeGoogle({
       CAESbAHEIkXXtokenA: "https://www.angi.com/articles/movers-cost/",
       CAESbAHEIkXXtokenB: "https://www.angi.com/articles/movers-cost/?utm_source=google",
+      CAESfootnote: "https://www.hireahelper.com/advice/stairs/",
     });
     const result = await resolveOverviewLinks(
       {
@@ -75,20 +76,22 @@ describe("resolveOverviewLinks", () => {
           ref("https://collegemovers.us/stairs", { domain: "collegemovers.us" }),
         ],
         inlineLinks: [{ url: GOTO_A, domain: "google.com", title: "Angi" }],
-        markdown: `Movers cost more with stairs ([Angi](${GOTO_A})).`,
+        markdown: `Movers cost more with stairs ([Angi](${GOTO_A})).[[1]](https://google.com/goto?url=CAESfootnote)`,
       },
       fetchImpl,
     );
 
-    expect(result.found).toBe(3);
-    expect(result.resolved).toBe(2);
+    expect(result.found).toBe(4);
+    expect(result.resolved).toBe(3);
     expect(result.references.map((r) => [r.url, r.domain, r.title])).toEqual([
       ["https://www.angi.com/articles/movers-cost", "angi.com", "Angi guide"],
       [GOTO_DEAD, "proseocontent.com", "Unresolved"],
       ["https://collegemovers.us/stairs", "collegemovers.us", "A page"],
     ]);
     expect(result.inlineLinks).toEqual([{ url: "https://www.angi.com/articles/movers-cost", domain: "angi.com", title: "Angi" }]);
-    expect(result.markdown).toBe("Movers cost more with stairs ([Angi](https://www.angi.com/articles/movers-cost)).");
+    expect(result.markdown).toBe(
+      "Movers cost more with stairs ([Angi](https://www.angi.com/articles/movers-cost)).[[1]](https://www.hireahelper.com/advice/stairs)",
+    );
   });
 
   it("makes no request when there is no redirect link", async () => {

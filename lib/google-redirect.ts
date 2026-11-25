@@ -93,6 +93,9 @@ async function mapLimit<T, R>(items: T[], limit: number, work: (item: T) => Prom
   return results;
 }
 
+/** Google redirect links written into the overview text, e.g. its footnote markers "[[1]](https://google.com/goto?url=...)". */
+const MARKDOWN_REDIRECT = /https?:\/\/(?:www\.)?google\.[a-z.]+\/(?:goto|url)\?[^\s)\]"'<>]+/gi;
+
 /** The site's domain when Google's `source` field names one ("proseocontent.com"), else null. */
 function domainFromSource(source: string | null): string | null {
   const value = source?.trim().toLowerCase() ?? "";
@@ -112,7 +115,8 @@ export interface ResolvedLinks {
 
 /**
  * Replaces Google redirect links in a sample's citations, inline links and
- * markdown with the pages they lead to. Citations that end up on the same page
+ * markdown (whose footnote markers carry links of their own) with the pages
+ * they lead to. Citations that end up on the same page
  * are merged (the first one is kept). A link Google wouldn't resolve stays as
  * it was, with its site's name from `source` when Google gave one.
  */
@@ -122,7 +126,11 @@ export async function resolveOverviewLinks(
 ): Promise<ResolvedLinks> {
   const redirects = [
     ...new Set(
-      [...overview.references.map((r) => r.url), ...overview.inlineLinks.map((l) => l.url)].filter(isGoogleRedirect),
+      [
+        ...overview.references.map((r) => r.url),
+        ...overview.inlineLinks.map((l) => l.url),
+        ...(overview.markdown?.match(MARKDOWN_REDIRECT) ?? []),
+      ].filter(isGoogleRedirect),
     ),
   ];
   if (redirects.length === 0) {
